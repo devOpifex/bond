@@ -1,25 +1,22 @@
 package openai
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/devOpifex/bond/models"
+	"github.com/devOpifex/bond/providers/common"
 )
 
 // OpenAIRequest represents a request to the OpenAI API
 type OpenAIRequest struct {
-	Model       string            `json:"model"`
-	MaxTokens   int               `json:"max_tokens"`
-	Messages    []OpenAIMessage   `json:"messages"`
-	Tools       []OpenAITool      `json:"tools,omitempty"`
-	ToolChoice  string            `json:"tool_choice,omitempty"`
-	Temperature float64           `json:"temperature"`
+	Model       string          `json:"model"`
+	MaxTokens   int             `json:"max_tokens"`
+	Messages    []OpenAIMessage `json:"messages"`
+	Tools       []OpenAITool    `json:"tools,omitempty"`
+	ToolChoice  string          `json:"tool_choice,omitempty"`
+	Temperature float64         `json:"temperature"`
 }
 
 // OpenAIMessage represents a message in OpenAI format
@@ -30,8 +27,8 @@ type OpenAIMessage struct {
 
 // OpenAITool represents a tool in OpenAI format
 type OpenAITool struct {
-	Type     string          `json:"type"`
-	Function OpenAIFunction  `json:"function"`
+	Type     string         `json:"type"`
+	Function OpenAIFunction `json:"function"`
 }
 
 // OpenAIFunction represents a function in OpenAI format
@@ -43,12 +40,12 @@ type OpenAIFunction struct {
 
 // OpenAIResponse represents a response from the OpenAI API
 type OpenAIResponse struct {
-	ID      string               `json:"id"`
-	Object  string               `json:"object"`
-	Created int64                `json:"created"`
-	Model   string               `json:"model"`
-	Choices []OpenAIChoice       `json:"choices"`
-	Usage   map[string]int       `json:"usage"`
+	ID      string         `json:"id"`
+	Object  string         `json:"object"`
+	Created int64          `json:"created"`
+	Model   string         `json:"model"`
+	Choices []OpenAIChoice `json:"choices"`
+	Usage   map[string]int `json:"usage"`
 }
 
 // OpenAIChoice represents a choice in an OpenAI response
@@ -60,9 +57,9 @@ type OpenAIChoice struct {
 
 // OpenAIRespMessage represents a message in an OpenAI response
 type OpenAIRespMessage struct {
-	Role         string              `json:"role"`
-	Content      string              `json:"content"`
-	ToolCalls    []OpenAIToolCall    `json:"tool_calls,omitempty"`
+	Role      string           `json:"role"`
+	Content   string           `json:"content"`
+	ToolCalls []OpenAIToolCall `json:"tool_calls,omitempty"`
 }
 
 // OpenAIToolCall represents a tool call in an OpenAI response
@@ -80,47 +77,20 @@ type OpenAIFuncCall struct {
 
 // Client is the OpenAI API client implementation
 type Client struct {
-	apiKey       string
-	baseURL      string
-	httpClient   *http.Client
-	tools        map[string]models.ToolExecutor
-	model        string
-	maxTokens    int
-	systemPrompt string
+	common.BaseClient
 }
 
 // NewClient creates a new OpenAI client
 func NewClient(apiKey string) *Client {
+	baseClient := common.NewBaseClient(
+		apiKey,
+		"https://api.openai.com/v1/chat/completions",
+		"gpt-4o",
+	)
+	
 	return &Client{
-		apiKey:  apiKey,
-		baseURL: "https://api.openai.com/v1/chat/completions",
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		tools:     make(map[string]models.ToolExecutor),
-		model:     "gpt-4o",
-		maxTokens: 1000,
+		BaseClient: baseClient,
 	}
-}
-
-// RegisterTool adds a tool that OpenAI can call
-func (c *Client) RegisterTool(tool models.ToolExecutor) {
-	c.tools[tool.GetName()] = tool
-}
-
-// SetModel configures which model to use
-func (c *Client) SetModel(model string) {
-	c.model = model
-}
-
-// SetMaxTokens configures the maximum number of tokens in the response
-func (c *Client) SetMaxTokens(tokens int) {
-	c.maxTokens = tokens
-}
-
-// SetSystemPrompt sets a system prompt that will be included in all requests
-func (c *Client) SetSystemPrompt(prompt string) {
-	c.systemPrompt = prompt
 }
 
 // SendMessage sends a message with specified role to OpenAI
@@ -128,10 +98,10 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 	var messages []OpenAIMessage
 	
 	// Add system prompt if set
-	if c.systemPrompt != "" {
+	if c.SystemPrompt != "" {
 		messages = append(messages, OpenAIMessage{
 			Role:    models.RoleSystem,
-			Content: c.systemPrompt,
+			Content: c.SystemPrompt,
 		})
 	}
 	
@@ -142,8 +112,8 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 	})
 	
 	request := OpenAIRequest{
-		Model:       c.model,
-		MaxTokens:   c.maxTokens,
+		Model:       c.Model,
+		MaxTokens:   c.MaxTokens,
 		Messages:    messages,
 		Temperature: 0.7,
 	}
@@ -180,7 +150,7 @@ func convertToolSchema(schema models.InputSchema) (json.RawMessage, error) {
 func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
 	// Convert registered tools to OpenAI tool format
 	var tools []OpenAITool
-	for _, tool := range c.tools {
+	for _, tool := range c.Tools {
 		// Convert our schema to OpenAI schema
 		parametersJSON, err := convertToolSchema(tool.GetSchema())
 		if err != nil {
@@ -200,10 +170,10 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	var messages []OpenAIMessage
 	
 	// Add system prompt if set
-	if c.systemPrompt != "" {
+	if c.SystemPrompt != "" {
 		messages = append(messages, OpenAIMessage{
 			Role:    models.RoleSystem,
-			Content: c.systemPrompt,
+			Content: c.SystemPrompt,
 		})
 	}
 	
@@ -214,8 +184,8 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	})
 
 	request := OpenAIRequest{
-		Model:       c.model,
-		MaxTokens:   c.maxTokens,
+		Model:       c.Model,
+		MaxTokens:   c.MaxTokens,
 		Messages:    messages,
 		Tools:       tools,
 		ToolChoice:  "auto",
@@ -232,21 +202,21 @@ func (c *Client) sendRequest(ctx context.Context, request OpenAIRequest) (string
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", err
+	// Prepare HTTP request
+	headers := map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": "Bearer " + c.ApiKey,
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", err
+	httpReq := common.HTTPRequest{
+		Method:  "POST",
+		URL:     c.BaseURL,
+		Headers: headers,
+		Body:    jsonData,
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// Send the request
+	body, err := c.DoHTTPRequest(ctx, httpReq)
 	if err != nil {
 		return "", err
 	}
@@ -267,24 +237,9 @@ func (c *Client) sendRequest(ctx context.Context, request OpenAIRequest) (string
 	// Handle tool calls if OpenAI wants to use a tool
 	if len(choice.Message.ToolCalls) > 0 {
 		toolCall := choice.Message.ToolCalls[0]
-		return c.handleToolCall(ctx, toolCall.Function.Name, []byte(toolCall.Function.Arguments))
+		return c.HandleToolCall(ctx, toolCall.Function.Name, []byte(toolCall.Function.Arguments))
 	}
 
 	// Otherwise return the text content
 	return choice.Message.Content, nil
-}
-
-// handleToolCall executes the requested tool
-func (c *Client) handleToolCall(ctx context.Context, toolName string, input json.RawMessage) (string, error) {
-	tool, exists := c.tools[toolName]
-	if !exists {
-		return "", fmt.Errorf("tool %s not found", toolName)
-	}
-
-	result, err := tool.Execute(input)
-	if err != nil {
-		return "", fmt.Errorf("tool execution failed: %w", err)
-	}
-
-	return result, nil
 }

@@ -1,15 +1,11 @@
 package claude
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"time"
 
 	"github.com/devOpifex/bond/models"
+	"github.com/devOpifex/bond/providers/common"
 )
 
 // ClaudeRequest represents a request to the Claude API
@@ -37,60 +33,33 @@ type ContentBlock struct {
 
 // Client is the Claude API client implementation
 type Client struct {
-	apiKey       string
-	baseURL      string
-	httpClient   *http.Client
-	tools        map[string]models.ToolExecutor
-	model        string
-	maxTokens    int
-	systemPrompt string
+	common.BaseClient
 }
 
 // NewClient creates a new Claude client
 func NewClient(apiKey string) *Client {
+	baseClient := common.NewBaseClient(
+		apiKey,
+		"https://api.anthropic.com/v1/messages",
+		"claude-3-sonnet-20240229",
+	)
+	
 	return &Client{
-		apiKey:  apiKey,
-		baseURL: "https://api.anthropic.com/v1/messages",
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		tools:     make(map[string]models.ToolExecutor),
-		model:     "claude-3-sonnet-20240229",
-		maxTokens: 1000,
+		BaseClient: baseClient,
 	}
-}
-
-// RegisterTool adds a tool that Claude can call
-func (c *Client) RegisterTool(tool models.ToolExecutor) {
-	c.tools[tool.GetName()] = tool
-}
-
-// SetModel configures which model to use
-func (c *Client) SetModel(model string) {
-	c.model = model
-}
-
-// SetMaxTokens configures the maximum number of tokens in the response
-func (c *Client) SetMaxTokens(tokens int) {
-	c.maxTokens = tokens
-}
-
-// SetSystemPrompt sets a system prompt that will be included in all requests
-func (c *Client) SetSystemPrompt(prompt string) {
-	c.systemPrompt = prompt
 }
 
 // SendMessage sends a message with specified role to Claude
 func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	request := ClaudeRequest{
-		Model:     c.model,
-		MaxTokens: c.maxTokens,
+		Model:     c.Model,
+		MaxTokens: c.MaxTokens,
 		Messages:  []models.Message{message},
 	}
 
 	// Add system prompt if set
-	if c.systemPrompt != "" {
-		request.System = c.systemPrompt
+	if c.SystemPrompt != "" {
+		request.System = c.SystemPrompt
 	}
 
 	return c.sendRequest(ctx, request)
@@ -100,7 +69,7 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
 	// Convert registered tools to Claude tool format
 	var tools []models.Tool
-	for _, tool := range c.tools {
+	for _, tool := range c.Tools {
 		tools = append(tools, models.Tool{
 			Name:        tool.GetName(),
 			Description: tool.GetDescription(),
@@ -109,15 +78,15 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	}
 
 	request := ClaudeRequest{
-		Model:     c.model,
-		MaxTokens: c.maxTokens,
+		Model:     c.Model,
+		MaxTokens: c.MaxTokens,
 		Messages:  []models.Message{message},
 		Tools:     tools,
 	}
 
 	// Add system prompt if set
-	if c.systemPrompt != "" {
-		request.System = c.systemPrompt
+	if c.SystemPrompt != "" {
+		request.System = c.SystemPrompt
 	}
 
 	// Store the original message in context
@@ -133,22 +102,22 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", err
+	// Prepare HTTP request
+	headers := map[string]string{
+		"Content-Type":       "application/json",
+		"x-api-key":          c.ApiKey,
+		"anthropic-version":  "2023-06-01",
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", c.apiKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", err
+	httpReq := common.HTTPRequest{
+		Method:  "POST",
+		URL:     c.BaseURL,
+		Headers: headers,
+		Body:    jsonData,
 	}
-	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// Send the request
+	body, err := c.DoHTTPRequest(ctx, httpReq)
 	if err != nil {
 		return "", err
 	}
@@ -173,7 +142,7 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 		}
 		
 		if toolUseBlock != nil {
-			result, err := c.handleToolCall(ctx, toolUseBlock.Name, toolUseBlock.Input)
+			result, err := c.HandleToolCall(ctx, toolUseBlock.Name, toolUseBlock.Input)
 			if err != nil {
 				return "", err
 			}
@@ -203,19 +172,4 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 	}
 
 	return "No response received", nil
-}
-
-// handleToolCall executes the requested tool
-func (c *Client) handleToolCall(ctx context.Context, toolName string, input json.RawMessage) (string, error) {
-	tool, exists := c.tools[toolName]
-	if !exists {
-		return "", fmt.Errorf("tool %s not found", toolName)
-	}
-
-	result, err := tool.Execute(input)
-	if err != nil {
-		return "", fmt.Errorf("tool execution failed: %w", err)
-	}
-
-	return result, nil
 }

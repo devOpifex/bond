@@ -36,7 +36,7 @@ func main() {
 		func(params map[string]interface{}) (string, error) {
 			location, _ := params["location"].(string)
 			// In a real implementation, you would call a weather API here
-			return fmt.Sprintf("The weather in %s is 72°F and sunny", location), nil
+			return fmt.Sprintf("The weather in %s is 5°C and rainy as usual", location), nil
 		},
 	)
 
@@ -49,7 +49,7 @@ func main() {
 		ctx,
 		models.Message{
 			Role:    models.RoleUser,
-			Content: "What's the weather like in Boston, MA?",
+			Content: "What's the weather like in Brussels, Belgium?",
 		},
 	)
 	if err != nil {

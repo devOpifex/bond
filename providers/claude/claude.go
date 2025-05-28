@@ -73,21 +73,19 @@ func (c *Client) SetMaxTokens(tokens int) {
 	c.maxTokens = tokens
 }
 
-// SendMessage sends a simple text message to Claude
-func (c *Client) SendMessage(ctx context.Context, content string) (string, error) {
+// SendMessage sends a message with specified role to Claude
+func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	request := ClaudeRequest{
 		Model:     c.model,
 		MaxTokens: c.maxTokens,
-		Messages: []models.Message{
-			{Role: "user", Content: content},
-		},
+		Messages:  []models.Message{message},
 	}
 
 	return c.sendRequest(ctx, request)
 }
 
-// SendMessageWithTools sends a message to Claude with registered tools
-func (c *Client) SendMessageWithTools(ctx context.Context, content string) (string, error) {
+// SendMessageWithTools sends a message with specified role to Claude with registered tools
+func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
 	// Convert registered tools to Claude tool format
 	var tools []models.Tool
 	for _, tool := range c.tools {
@@ -98,18 +96,15 @@ func (c *Client) SendMessageWithTools(ctx context.Context, content string) (stri
 		})
 	}
 
-	// Create the user message
-	userMessage := models.Message{Role: "user", Content: content}
-
 	request := ClaudeRequest{
 		Model:     c.model,
 		MaxTokens: c.maxTokens,
-		Messages:  []models.Message{userMessage},
+		Messages:  []models.Message{message},
 		Tools:     tools,
 	}
 
 	// Store the original message in context
-	ctx = context.WithValue(ctx, "original_message", userMessage)
+	ctx = context.WithValue(ctx, "original_message", message)
 
 	return c.sendRequest(ctx, request)
 }

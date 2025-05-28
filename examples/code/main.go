@@ -346,7 +346,10 @@ func main() {
 	fmt.Println("Now trying the same with traditional tool approach...")
 
 	// Traditional tool-based approach
-	response, err := provider.SendMessageWithTools(ctx, userQuery)
+	response, err := provider.SendMessageWithTools(ctx, models.Message{
+		Role:    models.RoleUser,
+		Content: userQuery,
+	})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return

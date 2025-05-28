@@ -41,7 +41,10 @@ func ProviderStep(id string, name string, description string, promptTemplate str
 			prompt := fmt.Sprintf(promptTemplate, input)
 			
 			// Send to provider
-			output, err := provider.SendMessage(ctx, prompt)
+			output, err := provider.SendMessage(ctx, models.Message{
+				Role:    models.RoleUser,
+				Content: prompt,
+			})
 			if err != nil {
 				return StepResult{Error: err}, err
 			}

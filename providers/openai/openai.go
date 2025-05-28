@@ -117,13 +117,13 @@ func (c *Client) SetMaxTokens(tokens int) {
 	c.maxTokens = tokens
 }
 
-// SendMessage sends a simple text message to OpenAI
-func (c *Client) SendMessage(ctx context.Context, content string) (string, error) {
+// SendMessage sends a message with specified role to OpenAI
+func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	request := OpenAIRequest{
 		Model:     c.model,
 		MaxTokens: c.maxTokens,
 		Messages: []OpenAIMessage{
-			{Role: "user", Content: content},
+			{Role: message.Role, Content: message.Content},
 		},
 		Temperature: 0.7,
 	}
@@ -156,8 +156,8 @@ func convertToolSchema(schema models.InputSchema) (json.RawMessage, error) {
 	return json.Marshal(openaiSchema)
 }
 
-// SendMessageWithTools sends a message to OpenAI with registered tools
-func (c *Client) SendMessageWithTools(ctx context.Context, content string) (string, error) {
+// SendMessageWithTools sends a message with specified role to OpenAI with registered tools
+func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
 	// Convert registered tools to OpenAI tool format
 	var tools []OpenAITool
 	for _, tool := range c.tools {
@@ -181,7 +181,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, content string) (stri
 		Model:      c.model,
 		MaxTokens:  c.maxTokens,
 		Messages: []OpenAIMessage{
-			{Role: "user", Content: content},
+			{Role: message.Role, Content: message.Content},
 		},
 		Tools:       tools,
 		ToolChoice:  "auto",

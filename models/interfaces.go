@@ -15,11 +15,11 @@ type ToolExecutor interface {
 
 // Provider defines the interface that all AI providers must implement
 type Provider interface {
-	// SendMessage sends a simple text message to the AI provider
-	SendMessage(ctx context.Context, content string) (string, error)
+	// SendMessage sends a message with the specified role and content to the AI provider
+	SendMessage(ctx context.Context, message Message) (string, error)
 	
-	// SendMessageWithTools sends a message with available tools to the AI provider
-	SendMessageWithTools(ctx context.Context, content string) (string, error)
+	// SendMessageWithTools sends a message with the specified role and content, plus available tools to the AI provider
+	SendMessageWithTools(ctx context.Context, message Message) (string, error)
 	
 	// RegisterTool adds a tool that the AI provider can call
 	RegisterTool(tool ToolExecutor)

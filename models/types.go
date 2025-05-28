@@ -1,5 +1,13 @@
 package models
 
+// Role constants for message roles
+const (
+	RoleUser      = "user"
+	RoleAssistant = "assistant"
+	RoleSystem    = "system"
+	RoleFunction  = "function"
+)
+
 // ToolUse represents Claude's request to use a tool
 type ToolUse struct {
 	Name  string `json:"name"`

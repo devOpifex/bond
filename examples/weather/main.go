@@ -50,7 +50,10 @@ func main() {
 	ctx := context.Background()
 	response, err := provider.SendMessageWithTools(
 		ctx,
-		"What's the weather like in Boston, MA?",
+		models.Message{
+			Role:    models.RoleUser,
+			Content: "What's the weather like in Boston, MA?",
+		},
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

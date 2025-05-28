@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github/devOpifex/bond/agent"
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/agent"
+	"github.com/devOpifex/bond/models"
 )
 
 // TestAgentTool tests a tool that delegates to agents

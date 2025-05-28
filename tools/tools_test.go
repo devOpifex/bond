@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/models"
 )
 
 // TestTools contains sample tool implementations for testing

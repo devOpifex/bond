@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/models"
 )
 
 // BaseTool provides common functionality for tools

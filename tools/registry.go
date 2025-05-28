@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/models"
 )
 
 // Registry manages all available tools

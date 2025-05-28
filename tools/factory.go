@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/models"
 )
 
 // Factory creates and initializes tools

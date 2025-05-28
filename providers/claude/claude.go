@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/models"
 )
 
 // ClaudeRequest represents a request to the Claude API

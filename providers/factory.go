@@ -3,9 +3,9 @@ package providers
 import (
 	"fmt"
 
-	"github/devOpifex/bond/models"
-	"github/devOpifex/bond/providers/claude"
-	"github/devOpifex/bond/providers/openai"
+	"github.com/devOpifex/bond/models"
+	"github.com/devOpifex/bond/providers/claude"
+	"github.com/devOpifex/bond/providers/openai"
 )
 
 // Type represents the type of AI provider

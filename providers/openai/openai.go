@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github/devOpifex/bond/models"
+	"github.com/devOpifex/bond/models"
 )
 
 // OpenAIRequest represents a request to the OpenAI API

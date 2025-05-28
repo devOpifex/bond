@@ -30,3 +30,9 @@ type Provider interface {
 	// SetMaxTokens configures the maximum number of tokens in the response
 	SetMaxTokens(tokens int)
 }
+
+// Agent defines the interface that all agents must implement
+type Agent interface {
+	// Process handles the input and returns a response
+	Process(ctx context.Context, input string) (string, error)
+}

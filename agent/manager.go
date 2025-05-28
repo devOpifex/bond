@@ -3,12 +3,12 @@ package agent
 import (
 	"context"
 	"fmt"
+	
+	"github.com/devOpifex/bond/models"
 )
 
-// Agent interface defines what an agent can do
-type Agent interface {
-	Process(ctx context.Context, input string) (string, error)
-}
+// Agent interface is now defined in models package
+type Agent = models.Agent
 
 // AgentManager manages different agents with different capabilities
 type AgentManager struct {

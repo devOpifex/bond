@@ -9,6 +9,7 @@ Bond provides a flexible framework for:
 1. Creating custom tools for AI assistants
 2. Managing specialized agents for different tasks
 3. Connecting with AI providers like Claude and OpenAI
+4. Orchestrating complex multi-step reasoning workflows
 
 ## Packages
 
@@ -16,6 +17,7 @@ Bond provides a flexible framework for:
 - **tools**: Framework for creating, managing, and executing tools
 - **agent**: Framework for building specialized agents for different capabilities
 - **providers**: Integration with AI providers (Claude, OpenAI)
+- **reasoning**: Multi-step reasoning with state management and workflow orchestration
 
 ## Installation
 
@@ -181,3 +183,45 @@ func main() {
 	fmt.Printf("Claude's response: %s\n", response)
 }
 ```
+
+## Multi-Step Reasoning
+
+For more complex tasks, Bond provides a multi-step reasoning framework in the `reasoning` package. This allows you to break down complex tasks into a series of steps with state management:
+
+```go
+// Create a workflow
+workflow := reasoning.NewWorkflow()
+
+// Add steps with dependencies
+workflow.AddStep(reasoning.ProcessorStep(
+    "extract-info",
+    "Extract information from input",
+    "Processes the input to extract key information",
+    func(ctx context.Context, input string, memory *reasoning.Memory) (string, map[string]interface{}, error) {
+        // Extract and process information
+        return "Processed result", map[string]interface{}{"key": "value"}, nil
+    },
+))
+
+// Add a step that depends on the previous step
+workflow.AddStep(reasoning.AgentStep(
+    "process-data",
+    "Process data",
+    "Uses an agent to process the extracted data",
+    "agent-capability",
+    agentManager,
+))
+
+// Execute the workflow
+result, err := workflow.Execute(ctx, userInput, "process-data")
+```
+
+The reasoning package provides:
+
+- **Memory management**: Share data between steps
+- **Dependency resolution**: Steps execute only after their dependencies
+- **Agent integration**: Use specialized agents in workflow steps
+- **Provider integration**: Direct access to AI providers in steps
+- **Custom processors**: Implement custom logic in any step
+
+See the `examples/code/main.go` for a complete example of using multi-step reasoning for a complex code generation and analysis task.

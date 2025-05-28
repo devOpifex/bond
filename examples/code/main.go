@@ -21,40 +21,16 @@ type LanguageCodeGenerator struct {
 }
 
 func (c *LanguageCodeGenerator) Process(ctx context.Context, input string) (string, error) {
-	// In a real implementation, this would use a specialized model or service
-	// tailored to the specific language
 	switch c.Language {
 	case "python":
-		return generatePythonCode(input), nil
+		return "<PYTHON CODE>", nil
 	case "javascript":
-		return generateJavaScriptCode(input), nil
+		return "<JAVASCRIPT CODE>", nil
 	case "go":
-		return generateGoCode(input), nil
+		return "<GO CODE>", nil
 	default:
 		return fmt.Sprintf("Sorry, I don't know how to generate %s code yet.", c.Language), nil
 	}
-}
-
-// Mock implementations of language-specific code generators
-func generatePythonCode(task string) string {
-	if strings.Contains(task, "fibonacci") {
-		return "```python\ndef fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)\n\n# Example usage\nfor i in range(10):\n    print(fibonacci(i))\n```"
-	}
-	return "```python\n# Python implementation for: " + task + "\ndef solution():\n    print('Implementation would go here')\n```"
-}
-
-func generateJavaScriptCode(task string) string {
-	if strings.Contains(task, "fibonacci") {
-		return "```javascript\nfunction fibonacci(n) {\n    if (n <= 1) return n;\n    return fibonacci(n-1) + fibonacci(n-2);\n}\n\n// Example usage\nfor (let i = 0; i < 10; i++) {\n    console.log(fibonacci(i));\n}\n```"
-	}
-	return "```javascript\n// JavaScript implementation for: " + task + "\nfunction solution() {\n    console.log('Implementation would go here');\n}\n```"
-}
-
-func generateGoCode(task string) string {
-	if strings.Contains(task, "fibonacci") {
-		return "```go\npackage main\n\nimport \"fmt\"\n\nfunc fibonacci(n int) int {\n    if n <= 1 {\n        return n\n    }\n    return fibonacci(n-1) + fibonacci(n-2)\n}\n\nfunc main() {\n    for i := 0; i < 10; i++ {\n        fmt.Println(fibonacci(i))\n    }\n}\n```"
-	}
-	return "```go\npackage main\n\nimport \"fmt\"\n\n// Go implementation for: " + task + "\nfunc solution() {\n    fmt.Println(\"Implementation would go here\")\n}\n\nfunc main() {\n    solution()\n}\n```"
 }
 
 // CodeExplainer is an agent that explains code
@@ -65,11 +41,10 @@ func (c *CodeExplainer) Process(ctx context.Context, input string) (string, erro
 	// Here we're just doing some simple pattern matching
 
 	if strings.Contains(input, "fibonacci") {
-		return "This code implements the Fibonacci sequence, where each number is the sum of the two preceding ones. " +
-			"It uses recursion to calculate each number. The time complexity is O(2^n) which is inefficient for large values.", nil
+		return "This is fibonacci code", nil
 	}
 
-	return "This code implements a solution for the specified task. It includes the necessary structure and placeholders for implementation.", nil
+	return "This is code", nil
 }
 
 // BenchmarkAnalyzer is an agent that analyzes code performance
@@ -80,21 +55,12 @@ func (b *BenchmarkAnalyzer) Process(ctx context.Context, input string) (string, 
 	// Here we're just simulating an analysis
 
 	if strings.Contains(input, "fibonacci") && strings.Contains(input, "python") {
-		return "Python Fibonacci (recursive):\n" +
-			"- Time complexity: O(2^n)\n" +
-			"- Space complexity: O(n) due to call stack\n" +
-			"- Benchmark: ~15ms for fibonacci(20)", nil
+		return "This is fibonacci Python code, people like it", nil
 	} else if strings.Contains(input, "fibonacci") && strings.Contains(input, "go") {
-		return "Go Fibonacci (recursive):\n" +
-			"- Time complexity: O(2^n)\n" +
-			"- Space complexity: O(n) due to call stack\n" +
-			"- Benchmark: ~5ms for fibonacci(20)", nil
+		return "This is fibonacci Go code, people love it", nil
 	}
 
-	return "Performance analysis:\n" +
-		"- Time complexity: Depends on implementation\n" +
-		"- Space complexity: Minimal memory usage\n" +
-		"- Consider optimizing for your specific use case", nil
+	return "This is code", nil
 }
 
 // CodeImprover is an agent that suggests improvements to code
@@ -105,26 +71,10 @@ func (i *CodeImprover) Process(ctx context.Context, input string) (string, error
 	// Here we're just doing some simple pattern matching
 
 	if strings.Contains(input, "fibonacci") {
-		return "Improvement suggestions:\n\n" +
-			"1. Use memoization to avoid redundant calculations:\n\n" +
-			"```python\ndef fibonacci_memo(n, memo={}):\n" +
-			"    if n in memo:\n" +
-			"        return memo[n]\n" +
-			"    if n <= 1:\n" +
-			"        return n\n" +
-			"    memo[n] = fibonacci_memo(n-1, memo) + fibonacci_memo(n-2, memo)\n" +
-			"    return memo[n]\n```\n\n" +
-			"2. Or use an iterative approach which is even more efficient:\n\n" +
-			"```python\ndef fibonacci_iter(n):\n" +
-			"    if n <= 1:\n" +
-			"        return n\n" +
-			"    a, b = 0, 1\n" +
-			"    for _ in range(2, n+1):\n" +
-			"        a, b = b, a+b\n" +
-			"    return b\n```", nil
+		return "This is improved fibonacci code", nil
 	}
 
-	return "Consider adding error handling, parameter validation, and documentation to make your code more robust.", nil
+	return "This is improved code", nil
 }
 
 // extractCodeLanguage extracts the programming language from the input
@@ -232,7 +182,7 @@ func main() {
 	ctx := context.Background()
 
 	// This is our input query from the user
-	userQuery := "Create a Fibonacci function in Python and tell me how I could improve it"
+	userQuery := "Create a fibonacci function in Go and tell me how I could improve it"
 
 	fmt.Println("User query:", userQuery)
 	fmt.Println("-----------------------------------")
@@ -354,7 +304,7 @@ func main() {
 		Name:        "Generate Report",
 		Description: "Generates final comprehensive report",
 		// Only depend on suggest-improvements and explain-code to avoid potential cycles
-		DependsOn:   []string{"suggest-improvements", "explain-code"},
+		DependsOn: []string{"suggest-improvements", "explain-code"},
 		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
 			language, _ := memory.GetString("language")
 			task, _ := memory.GetString("task")
@@ -383,36 +333,25 @@ func main() {
 	})
 
 	// Execute the workflow
-	start := time.Now()
 	result, err := workflow.Execute(ctx, userQuery, "generate-report")
 	if err != nil {
 		fmt.Printf("Workflow error: %v\n", err)
 		return
 	}
-	elapsed := time.Since(start)
 
-	fmt.Println("-----------------------------------")
-	fmt.Printf("Workflow completed in %v\n", elapsed)
-	fmt.Println("-----------------------------------")
 	fmt.Println(result)
 
 	// For comparison, use the traditional tool approach
 	fmt.Println("-----------------------------------")
 	fmt.Println("Now trying the same with traditional tool approach...")
-	traditionalStart := time.Now()
 
 	// Traditional tool-based approach
-	prompt := "I need to calculate Fibonacci numbers in Python and suggest improvements"
-	response, err := provider.SendMessageWithTools(ctx, prompt)
+	response, err := provider.SendMessageWithTools(ctx, userQuery)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
 
-	traditionalElapsed := time.Since(traditionalStart)
-	fmt.Println("-----------------------------------")
-	fmt.Printf("Traditional approach completed in %v\n", traditionalElapsed)
 	fmt.Println("-----------------------------------")
 	fmt.Printf("Claude's response:\n%s\n", response)
 }
-

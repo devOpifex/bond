@@ -61,7 +61,7 @@ func main() {
 			Properties: map[string]models.Property{
 				"location": {
 					Type:        "string",
-					Description: "The city and state/country (e.g., 'San Francisco, CA')",
+					Description: "The city and state or city/country (e.g., 'San Francisco, CA')",
 				},
 			},
 			Required: []string{"location"},
@@ -69,7 +69,7 @@ func main() {
 		func(params map[string]interface{}) (string, error) {
 			location, _ := params["location"].(string)
 			// In a real implementation, you would call a weather API here
-			return fmt.Sprintf("The weather in %s is 72°F and sunny", location), nil
+			return fmt.Sprintf("The weather in %s is 10°C and raining as usual", location), nil
 		},
 	)
 
@@ -79,8 +79,8 @@ func main() {
 	// Send a message that will use the tool
 	ctx := context.Background()
 	response, err := provider.SendMessageWithTools(
-		ctx, 
-		"What's the weather like in Boston, MA?",
+		ctx,
+		"What's the weather like in Brussesl, Belgium?",
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

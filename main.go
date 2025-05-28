@@ -22,19 +22,24 @@ func main() {
 	provider.SetModel("claude-3-sonnet-20240229")
 	provider.SetMaxTokens(1000)
 
-	// Register tools with provider
-	provider.RegisterTool(&tools.WeatherTool{})
-	provider.RegisterTool(&tools.CalculatorTool{})
-
-	// Register custom Llama agent tool
+	// Create agent manager
 	agentManager := agent.NewAgentManager()
-
+	
 	// Register example agents
 	agentManager.RegisterAgent("code-generation", &agent.SimpleAgent{Name: "CodeGen"})
 	agentManager.RegisterAgent("data-analysis", &agent.SimpleAgent{Name: "DataAnalyst"})
 
-	llamaTool := tools.NewLlamaAgentTool(agentManager)
-	provider.RegisterTool(llamaTool)
+	// Create tool factory and initialize built-in tools
+	toolFactory := tools.NewFactory(agentManager)
+	if err := toolFactory.CreateBuiltInTools(); err != nil {
+		fmt.Printf("Error creating tools: %v\n", err)
+		return
+	}
+
+	// Register all tools with the provider
+	for _, tool := range toolFactory.Registry().GetAll() {
+		provider.RegisterTool(tool)
+	}
 
 	// Example usage with tools
 	ctx := context.Background()

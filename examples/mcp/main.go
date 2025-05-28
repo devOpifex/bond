@@ -8,7 +8,7 @@ import (
 
 	"github.com/devOpifex/bond/mcp"
 	"github.com/devOpifex/bond/models"
-	"github.com/devOpifex/bond/providers"
+	"github.com/devOpifex/bond/providers/claude"
 )
 
 func main() {
@@ -18,11 +18,8 @@ func main() {
 		log.Fatal("ANTHROPIC_API_KEY environment variable not set")
 	}
 
-	// Create a provider
-	provider, err := providers.NewProvider(providers.Claude, apiKey)
-	if err != nil {
-		log.Fatalf("Failed to create provider: %v", err)
-	}
+	// Create a Claude provider
+	provider := claude.NewClient(apiKey)
 
 	// Configure the provider
 	provider.SetModel("claude-3-sonnet-20240229")

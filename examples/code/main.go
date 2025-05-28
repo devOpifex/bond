@@ -10,7 +10,7 @@ import (
 
 	"github.com/devOpifex/bond/agent"
 	"github.com/devOpifex/bond/models"
-	"github.com/devOpifex/bond/providers"
+	"github.com/devOpifex/bond/providers/claude"
 	"github.com/devOpifex/bond/reasoning"
 	"github.com/devOpifex/bond/tools"
 )
@@ -119,11 +119,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	provider, err := providers.NewProvider(providers.Claude, apiKey)
-	if err != nil {
-		fmt.Printf("Error creating provider: %v\n", err)
-		return
-	}
+	provider := claude.NewClient(apiKey)
 
 	// Configure the provider
 	provider.SetModel("claude-3-sonnet-20240229")

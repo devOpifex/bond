@@ -98,14 +98,18 @@ func (c *Client) SendMessageWithTools(ctx context.Context, content string) (stri
 		})
 	}
 
+	// Create the user message
+	userMessage := models.Message{Role: "user", Content: content}
+
 	request := ClaudeRequest{
 		Model:     c.model,
 		MaxTokens: c.maxTokens,
-		Messages: []models.Message{
-			{Role: "user", Content: content},
-		},
-		Tools: tools,
+		Messages:  []models.Message{userMessage},
+		Tools:     tools,
 	}
+
+	// Store the original message in context
+	ctx = context.WithValue(ctx, "original_message", userMessage)
 
 	return c.sendRequest(ctx, request)
 }
@@ -142,14 +146,48 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 		return "", err
 	}
 
-	// Handle tool calls if Claude wants to use a tool
+	// If stop_reason is "tool_use", Claude wants to use a tool
+	if claudeResp.StopReason == "tool_use" {
+		// Find the tool_use block
+		var toolUseBlock *ContentBlock
+		var textBlocks []string
+		
+		for _, block := range claudeResp.Content {
+			if block.Type == "tool_use" {
+				toolUseBlock = &block
+			} else if block.Type == "text" {
+				textBlocks = append(textBlocks, block.Text)
+			}
+		}
+		
+		if toolUseBlock != nil {
+			result, err := c.handleToolCall(ctx, toolUseBlock.Name, toolUseBlock.Input)
+			if err != nil {
+				return "", err
+			}
+			
+			// Combine the text blocks with the tool result
+			combinedResponse := ""
+			for _, text := range textBlocks {
+				combinedResponse += text + "\n"
+			}
+			combinedResponse += result
+			
+			return combinedResponse, nil
+		}
+	}
+	
+	// If Claude didn't request a tool or we couldn't find the tool_use block,
+	// just return any text blocks
+	var textResponse string
 	for _, block := range claudeResp.Content {
-		if block.Type == "tool_use" {
-			return c.handleToolCall(ctx, block.Name, block.Input)
-		}
 		if block.Type == "text" {
-			return block.Text, nil
+			textResponse += block.Text
 		}
+	}
+	
+	if textResponse != "" {
+		return textResponse, nil
 	}
 
 	return "No response received", nil

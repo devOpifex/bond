@@ -1,9 +1,23 @@
 package models
 
+// ToolUse represents Claude's request to use a tool
+type ToolUse struct {
+	Name  string `json:"name"`
+	Input string `json:"input"`
+}
+
+// ToolResult represents the result of a tool execution
+type ToolResult struct {
+	ToolName string `json:"tool_name"`
+	Result   string `json:"result"`
+}
+
 // Message represents a chat message
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string      `json:"role"`
+	Content    string      `json:"content"`
+	ToolUse    *ToolUse    `json:"tool_use,omitempty"`
+	ToolResult *ToolResult `json:"tool_result,omitempty"`
 }
 
 // Tool defines a function that the AI model can call

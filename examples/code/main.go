@@ -38,7 +38,7 @@ func main() {
 	// Create a tool that uses the agent
 	agentTool := tools.NewTool(
 		"generate_code",
-		"Generate code using a specialized agent",
+		"You are an AI code generator. Generate code using a specialized agent",
 		models.InputSchema{
 			Type: "object",
 			Properties: map[string]models.Property{

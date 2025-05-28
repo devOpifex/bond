@@ -25,6 +25,37 @@ Bond provides a flexible framework for:
 go get github.com/devOpifex/bond
 ```
 
+## Key Concepts
+
+### Messages and Roles
+
+Bond uses a structured approach to messages with different roles:
+
+```go
+// Create a message with a specific role
+message := models.Message{
+    Role:    models.RoleUser,     // Use predefined role constants
+    Content: "Your message here",
+}
+```
+
+Available role constants:
+- `models.RoleUser` - For messages from the user
+- `models.RoleAssistant` - For messages from the AI assistant
+- `models.RoleSystem` - For system instructions (Claude uses a separate field)
+- `models.RoleFunction` - For function/tool responses
+
+### System Prompts
+
+You can set a system prompt to guide the AI's behavior across all messages:
+
+```go
+// Set a system prompt to guide the AI's behavior
+provider.SetSystemPrompt("You are a helpful assistant that specializes in data analysis.")
+```
+
+The system prompt provides context and instructions that persist across the conversation.
+
 ## Basic Example
 
 Here's a simple example showing how to create a custom tool, register it with Claude, and use it:
@@ -78,11 +109,17 @@ func main() {
 	// Register the tool with the provider
 	provider.RegisterTool(weatherTool)
 
+	// Set a system prompt to guide the AI's behavior
+	provider.SetSystemPrompt("You are a weather assistant. Always be concise and factual.")
+
 	// Send a message that will use the tool
 	ctx := context.Background()
 	response, err := provider.SendMessageWithTools(
 		ctx,
-		"What's the weather like in Brussesl, Belgium?",
+		models.Message{
+			Role:    models.RoleUser,
+			Content: "What's the weather like in Brussels, Belgium?",
+		},
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -169,11 +206,17 @@ func main() {
 	// Register the agent tool with the provider
 	provider.RegisterTool(agentTool)
 
+	// Set a system prompt to guide the AI's behavior
+	provider.SetSystemPrompt("You are a coding assistant. Focus on providing clear, well-commented code.")
+
 	// Send a message that will use the agent through the tool
 	ctx := context.Background()
 	response, err := provider.SendMessageWithTools(
 		ctx, 
-		"Can you generate a Python function to calculate Fibonacci numbers?",
+		models.Message{
+			Role:    models.RoleUser,
+			Content: "Can you generate a Python function to calculate Fibonacci numbers?",
+		},
 	)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)

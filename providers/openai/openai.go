@@ -80,12 +80,13 @@ type OpenAIFuncCall struct {
 
 // Client is the OpenAI API client implementation
 type Client struct {
-	apiKey     string
-	baseURL    string
-	httpClient *http.Client
-	tools      map[string]models.ToolExecutor
-	model      string
-	maxTokens  int
+	apiKey       string
+	baseURL      string
+	httpClient   *http.Client
+	tools        map[string]models.ToolExecutor
+	model        string
+	maxTokens    int
+	systemPrompt string
 }
 
 // NewClient creates a new OpenAI client
@@ -117,14 +118,33 @@ func (c *Client) SetMaxTokens(tokens int) {
 	c.maxTokens = tokens
 }
 
+// SetSystemPrompt sets a system prompt that will be included in all requests
+func (c *Client) SetSystemPrompt(prompt string) {
+	c.systemPrompt = prompt
+}
+
 // SendMessage sends a message with specified role to OpenAI
 func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
+	var messages []OpenAIMessage
+	
+	// Add system prompt if set
+	if c.systemPrompt != "" {
+		messages = append(messages, OpenAIMessage{
+			Role:    models.RoleSystem,
+			Content: c.systemPrompt,
+		})
+	}
+	
+	// Add the user/assistant message
+	messages = append(messages, OpenAIMessage{
+		Role:    message.Role,
+		Content: message.Content,
+	})
+	
 	request := OpenAIRequest{
-		Model:     c.model,
-		MaxTokens: c.maxTokens,
-		Messages: []OpenAIMessage{
-			{Role: message.Role, Content: message.Content},
-		},
+		Model:       c.model,
+		MaxTokens:   c.maxTokens,
+		Messages:    messages,
 		Temperature: 0.7,
 	}
 
@@ -177,12 +197,26 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		})
 	}
 
+	var messages []OpenAIMessage
+	
+	// Add system prompt if set
+	if c.systemPrompt != "" {
+		messages = append(messages, OpenAIMessage{
+			Role:    models.RoleSystem,
+			Content: c.systemPrompt,
+		})
+	}
+	
+	// Add the user/assistant message
+	messages = append(messages, OpenAIMessage{
+		Role:    message.Role,
+		Content: message.Content,
+	})
+
 	request := OpenAIRequest{
-		Model:      c.model,
-		MaxTokens:  c.maxTokens,
-		Messages: []OpenAIMessage{
-			{Role: message.Role, Content: message.Content},
-		},
+		Model:       c.model,
+		MaxTokens:   c.maxTokens,
+		Messages:    messages,
 		Tools:       tools,
 		ToolChoice:  "auto",
 		Temperature: 0.7,

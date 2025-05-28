@@ -24,6 +24,9 @@ type Provider interface {
 	// RegisterTool adds a tool that the AI provider can call
 	RegisterTool(tool ToolExecutor)
 	
+	// SetSystemPrompt sets a system prompt that will be included in all requests
+	SetSystemPrompt(prompt string)
+	
 	// SetModel configures which model to use for this provider
 	SetModel(model string)
 	

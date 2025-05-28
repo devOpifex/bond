@@ -21,6 +21,7 @@ func main() {
 	// Configure provider
 	provider.SetModel("claude-3-sonnet-20240229")
 	provider.SetMaxTokens(1000)
+	provider.SetSystemPrompt("You are a weather assistant. Always answer questions about weather concisely.")
 
 	// Create a weather tool
 	weatherTool := tools.NewTool(

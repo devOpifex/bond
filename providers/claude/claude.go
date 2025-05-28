@@ -16,6 +16,7 @@ import (
 type ClaudeRequest struct {
 	Model     string           `json:"model"`
 	MaxTokens int              `json:"max_tokens"`
+	System    string           `json:"system,omitempty"`
 	Messages  []models.Message `json:"messages"`
 	Tools     []models.Tool    `json:"tools,omitempty"`
 }
@@ -36,12 +37,13 @@ type ContentBlock struct {
 
 // Client is the Claude API client implementation
 type Client struct {
-	apiKey     string
-	baseURL    string
-	httpClient *http.Client
-	tools      map[string]models.ToolExecutor
-	model      string
-	maxTokens  int
+	apiKey       string
+	baseURL      string
+	httpClient   *http.Client
+	tools        map[string]models.ToolExecutor
+	model        string
+	maxTokens    int
+	systemPrompt string
 }
 
 // NewClient creates a new Claude client
@@ -73,12 +75,22 @@ func (c *Client) SetMaxTokens(tokens int) {
 	c.maxTokens = tokens
 }
 
+// SetSystemPrompt sets a system prompt that will be included in all requests
+func (c *Client) SetSystemPrompt(prompt string) {
+	c.systemPrompt = prompt
+}
+
 // SendMessage sends a message with specified role to Claude
 func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	request := ClaudeRequest{
 		Model:     c.model,
 		MaxTokens: c.maxTokens,
 		Messages:  []models.Message{message},
+	}
+
+	// Add system prompt if set
+	if c.systemPrompt != "" {
+		request.System = c.systemPrompt
 	}
 
 	return c.sendRequest(ctx, request)
@@ -101,6 +113,11 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		MaxTokens: c.maxTokens,
 		Messages:  []models.Message{message},
 		Tools:     tools,
+	}
+
+	// Add system prompt if set
+	if c.systemPrompt != "" {
+		request.System = c.systemPrompt
 	}
 
 	// Store the original message in context

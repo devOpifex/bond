@@ -219,6 +219,100 @@ func main() {
 }
 ```
 
+## ReAct Agent
+
+Bond provides a ReAct (Reasoning + Acting) agent implementation that combines reasoning with tool use in an iterative process:
+
+```go
+// Create a provider
+provider := claude.NewClient(os.Getenv("ANTHROPIC_API_KEY"))
+
+// Create a ReAct agent
+reactAgent := reasoning.NewReActAgent(provider)
+
+// Configure the agent (optional)
+reactAgent.SetMaxIterations(5)  // Default is 10
+reactAgent.SetSystemPrompt("Custom system prompt")  // Override default prompt
+
+// Register tools with the agent
+reactAgent.RegisterTool(myTool)
+
+// Process a query using the ReAct agent
+ctx := context.Background()
+result, err := reactAgent.Process(ctx, "What is 21 + 21?")
+```
+
+The ReAct agent:
+- Maintains an internal conversation state
+- Parses tool usage from model responses
+- Executes tools and feeds results back to the model
+- Continues iterations until a final answer is reached
+- Supports easy integration with the Chain API
+
+### Using ReAct in Chains
+
+The ReAct agent can be integrated into reasoning chains:
+
+```go
+// Create a chain
+chain := reasoning.NewChain()
+
+// Add preprocessing step
+chain.Add(reasoning.WithProcessor(
+    "Preprocess Input",
+    "Reformats the input for the agent",
+    func(ctx context.Context, input string) (string, error) {
+        return fmt.Sprintf("I need help with this question: %s", input), nil
+    },
+))
+
+// Add the ReAct agent as a step
+chain.Then(reactAgent.AsStep(
+    "Solve Problem",
+    "Uses a ReAct agent with tools to solve the problem",
+))
+
+// Add postprocessing step
+chain.Then(reasoning.WithProcessor(
+    "Format Output",
+    "Formats the agent's response",
+    func(ctx context.Context, input string) (string, error) {
+        return fmt.Sprintf("Final answer: %s", input), nil
+    },
+))
+
+// Execute the chain
+result, err := chain.Execute(ctx, "What is 21 + 21?")
+```
+
+See the `examples/react/main.go` and `examples/react_in_chain/main.go` for complete examples.
+
+## Simplified Reasoning Chains
+
+Bond's reasoning framework has been refactored to provide a simpler Chain API that replaces the older Workflow approach:
+
+```go
+// Create a chain
+chain := reasoning.NewChain()
+
+// Add steps with a fluent API
+chain.Add(myFirstStep).
+     Then(mySecondStep).
+     Then(myThirdStep)
+
+// Execute the chain
+result, err := chain.Execute(ctx, "User input")
+```
+
+The simplified Chain API:
+- Provides a more intuitive sequential execution model
+- Eliminates complex dependency management
+- Simplifies state management between steps
+- Offers a fluent interface for better readability
+- Seamlessly integrates with ReAct agents
+
+Each step in a chain takes the output of the previous step as its input, creating a clean data flow throughout the execution process.
+
 ## Multi-Step Reasoning
 
 For more complex tasks, Bond provides a multi-step reasoning framework in the `reasoning` package. This allows you to break down complex tasks into a series of steps with state management:

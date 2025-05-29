@@ -9,9 +9,8 @@ import (
 )
 
 // AgentStep creates a reasoning step that uses an agent
-func AgentStep(id string, name string, description string, capability string, agentManager *agent.AgentManager) *Step {
+func AgentStep(name string, description string, capability string, agentManager *agent.AgentManager) *Step {
 	return &Step{
-		ID:          id,
 		Name:        name,
 		Description: description,
 		Execute: func(ctx context.Context, input string, memory *Memory) (StepResult, error) {
@@ -31,9 +30,8 @@ func AgentStep(id string, name string, description string, capability string, ag
 }
 
 // ProviderStep creates a reasoning step that uses an AI provider directly
-func ProviderStep(id string, name string, description string, promptTemplate string, provider models.Provider) *Step {
+func ProviderStep(name string, description string, promptTemplate string, provider models.Provider) *Step {
 	return &Step{
-		ID:          id,
 		Name:        name,
 		Description: description,
 		Execute: func(ctx context.Context, input string, memory *Memory) (StepResult, error) {
@@ -63,9 +61,8 @@ func ProviderStep(id string, name string, description string, promptTemplate str
 type MemoryProcessor func(ctx context.Context, input string, memory *Memory) (string, map[string]interface{}, error)
 
 // ProcessorStep creates a reasoning step that runs a custom processor function
-func ProcessorStep(id string, name string, description string, processor MemoryProcessor) *Step {
+func ProcessorStep(name string, description string, processor MemoryProcessor) *Step {
 	return &Step{
-		ID:          id,
 		Name:        name,
 		Description: description,
 		Execute: func(ctx context.Context, input string, memory *Memory) (StepResult, error) {

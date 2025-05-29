@@ -189,7 +189,6 @@ func main() {
 
 	// Step 1: Extract code language and task
 	workflow.AddStep(reasoning.ProcessorStep(
-		"extract-info",
 		"Extract language and task from query",
 		"Extracts programming language and task description from the user query",
 		func(ctx context.Context, input string, memory *reasoning.Memory) (string, map[string]interface{}, error) {
@@ -205,14 +204,11 @@ func main() {
 					"task":     task,
 				}, nil
 		},
-	))
-
+	)).
 	// Step 2: Generate code based on extracted info
-	workflow.AddStep(&reasoning.Step{
-		ID:          "generate-code",
+	Then(&reasoning.Step{
 		Name:        "Generate Code",
 		Description: "Generates code in the requested language",
-		DependsOn:   []string{"extract-info"},
 		Execute: func(ctx context.Context, _ string, memory *reasoning.Memory) (reasoning.StepResult, error) {
 			language, _ := memory.GetString("language")
 			task, _ := memory.GetString("task")
@@ -231,14 +227,11 @@ func main() {
 				},
 			}, nil
 		},
-	})
-
+	}).
 	// Step 3: Explain the generated code
-	workflow.AddStep(&reasoning.Step{
-		ID:          "explain-code",
+	Then(&reasoning.Step{
 		Name:        "Explain Code",
 		Description: "Explains the generated code",
-		DependsOn:   []string{"generate-code"},
 		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
 			explanation, err := agentManager.ProcessWithBestAgent(ctx, "code-explainer", input)
 			if err != nil {
@@ -249,14 +242,11 @@ func main() {
 				Output: explanation,
 			}, nil
 		},
-	})
-
+	}).
 	// Step 4: Analyze performance
-	workflow.AddStep(&reasoning.Step{
-		ID:          "analyze-performance",
+	Then(&reasoning.Step{
 		Name:        "Analyze Performance",
 		Description: "Analyzes code performance",
-		DependsOn:   []string{"generate-code"},
 		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
 			language, _ := memory.GetString("language")
 
@@ -270,17 +260,15 @@ func main() {
 				Output: analysis,
 			}, nil
 		},
-	})
-
+	}).
 	// Step 5: Suggest improvements
-	workflow.AddStep(&reasoning.Step{
-		ID:          "suggest-improvements",
+	Then(&reasoning.Step{
 		Name:        "Suggest Improvements",
 		Description: "Suggests improvements to the code",
-		DependsOn:   []string{"generate-code", "analyze-performance"},
 		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
-			codeOutput, _ := memory.GetString("step.generate-code.output")
-			performanceAnalysis, _ := memory.GetString("step.analyze-performance.output")
+			// We can access outputs from step indexes
+			codeOutput, _ := memory.GetString("step.step_1.output")
+			performanceAnalysis, _ := memory.GetString("step.step_3.output")
 
 			improvementInput := fmt.Sprintf("%s\n\nPerformance Analysis:\n%s", codeOutput, performanceAnalysis)
 			improvements, err := agentManager.ProcessWithBestAgent(ctx, "code-improver", improvementInput)
@@ -292,22 +280,18 @@ func main() {
 				Output: improvements,
 			}, nil
 		},
-	})
-
-	// Step 6: Generate final report (simplified dependencies)
-	workflow.AddStep(&reasoning.Step{
-		ID:          "generate-report",
+	}).
+	// Step 6: Generate final report
+	Then(&reasoning.Step{
 		Name:        "Generate Report",
 		Description: "Generates final comprehensive report",
-		// Only depend on suggest-improvements and explain-code to avoid potential cycles
-		DependsOn: []string{"suggest-improvements", "explain-code"},
 		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
 			language, _ := memory.GetString("language")
 			task, _ := memory.GetString("task")
-			code, _ := memory.GetString("step.generate-code.output")
-			explanation, _ := memory.GetString("step.explain-code.output")
-			performance, _ := memory.GetString("step.analyze-performance.output")
-			improvements, _ := memory.GetString("step.suggest-improvements.output")
+			code, _ := memory.GetString("step.step_1.output")
+			explanation, _ := memory.GetString("step.step_2.output")
+			performance, _ := memory.GetString("step.step_3.output")
+			improvements, _ := memory.GetString("step.step_4.output")
 
 			report := fmt.Sprintf(
 				"# Code Solution Report\n\n"+
@@ -329,7 +313,7 @@ func main() {
 	})
 
 	// Execute the workflow
-	result, err := workflow.Execute(ctx, userQuery, "generate-report")
+	result, err := workflow.Execute(ctx, userQuery)
 	if err != nil {
 		fmt.Printf("Workflow error: %v\n", err)
 		return

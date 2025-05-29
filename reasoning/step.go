@@ -14,11 +14,10 @@ type StepResult struct {
 
 // Step defines a single reasoning step
 type Step struct {
-	ID          string
+	id          string // Internal use only
 	Name        string
 	Description string
 	Execute     StepExecutor
-	DependsOn   []string // IDs of steps this step depends on
 }
 
 // StepExecutor is a function that executes a single step
@@ -38,9 +37,10 @@ func NewChain() *Chain {
 	}
 }
 
-// AddStep adds a step to the chain
-func (c *Chain) AddStep(step *Step) {
+// AddStep adds a step to the chain and returns the chain for method chaining
+func (c *Chain) AddStep(step *Step) *Chain {
 	c.steps = append(c.steps, step)
+	return c
 }
 
 // Execute runs all steps in the chain in sequence
@@ -48,16 +48,21 @@ func (c *Chain) Execute(ctx context.Context, input string) (string, error) {
 	var result string
 	currentInput := input
 
-	for _, step := range c.steps {
+	for i, step := range c.steps {
+		// Generate an ID if not already set
+		if step.id == "" {
+			step.id = fmt.Sprintf("step_%d", i)
+		}
+
 		stepResult, err := step.Execute(ctx, currentInput, c.memory)
 		if err != nil {
-			return "", fmt.Errorf("error executing step %s: %w", step.ID, err)
+			return "", fmt.Errorf("error executing step %s: %w", step.Name, err)
 		}
 
 		// Store results in memory
-		c.memory.Set(fmt.Sprintf("step.%s.output", step.ID), stepResult.Output)
+		c.memory.Set(fmt.Sprintf("step.%s.output", step.id), stepResult.Output)
 		for k, v := range stepResult.Metadata {
-			c.memory.Set(fmt.Sprintf("step.%s.%s", step.ID, k), v)
+			c.memory.Set(fmt.Sprintf("step.%s.%s", step.id, k), v)
 		}
 
 		// Use this step's output as input to the next step
@@ -71,4 +76,9 @@ func (c *Chain) Execute(ctx context.Context, input string) (string, error) {
 // GetMemory returns the chain's memory store
 func (c *Chain) GetMemory() *Memory {
 	return c.memory
+}
+
+// Then is an alias for AddStep to provide a more fluent API
+func (c *Chain) Then(step *Step) *Chain {
+	return c.AddStep(step)
 }

@@ -54,6 +54,17 @@ workflow.AddStep(step1).Then(step2)  // Method chaining supported
 result, err := workflow.Execute(ctx, "initial input")
 ```
 
+### ReActAgent
+
+A Reasoning + Acting agent that follows a loop of reasoning about what to do next, taking actions using tools, and incorporating observations to achieve a goal:
+
+```go
+provider := claude.NewClaudeProvider("<API_KEY>")
+reactAgent := reasoning.NewReActAgent(provider)
+reactAgent.RegisterTool(someTool)
+result, err := reactAgent.Process(ctx, "Solve this problem...")
+```
+
 ## Adapters
 
 The package provides adapters to integrate with Bond agents and providers:
@@ -95,7 +106,7 @@ step := reasoning.ProcessorStep(
 
 ## Example Usage
 
-See the `/examples/simplified/main.go` for a complete example of using multi-step reasoning for code generation and analysis.
+See the `/examples/react/main.go` for a complete example of using the ReAct agent with tools.
 
 ### Accessing Step Outputs
 

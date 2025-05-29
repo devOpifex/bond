@@ -41,24 +41,24 @@ func (t *MockTool) Execute(input json.RawMessage) (string, error) {
 func TestNewClient(t *testing.T) {
 	client := NewClient("test-api-key")
 
-	if client.apiKey != "test-api-key" {
-		t.Errorf("Expected API key 'test-api-key', got '%s'", client.apiKey)
+	if client.ApiKey != "test-api-key" {
+		t.Errorf("Expected API key 'test-api-key', got '%s'", client.ApiKey)
 	}
 
-	if client.baseURL != "https://api.anthropic.com/v1/messages" {
-		t.Errorf("Expected base URL 'https://api.anthropic.com/v1/messages', got '%s'", client.baseURL)
+	if client.BaseURL != "https://api.anthropic.com/v1/messages" {
+		t.Errorf("Expected base URL 'https://api.anthropic.com/v1/messages', got '%s'", client.BaseURL)
 	}
 
-	if client.model != "claude-3-sonnet-20240229" {
-		t.Errorf("Expected default model 'claude-3-sonnet-20240229', got '%s'", client.model)
+	if client.Model != "claude-3-sonnet-20240229" {
+		t.Errorf("Expected default model 'claude-3-sonnet-20240229', got '%s'", client.Model)
 	}
 
-	if client.maxTokens != 1000 {
-		t.Errorf("Expected default max tokens 1000, got %d", client.maxTokens)
+	if client.MaxTokens != 1000 {
+		t.Errorf("Expected default max tokens 1000, got %d", client.MaxTokens)
 	}
 
-	if len(client.tools) != 0 {
-		t.Errorf("Expected empty tools map, got %d tools", len(client.tools))
+	if len(client.Tools) != 0 {
+		t.Errorf("Expected empty tools map, got %d tools", len(client.Tools))
 	}
 }
 
@@ -85,12 +85,12 @@ func TestRegisterTool(t *testing.T) {
 	client.RegisterTool(mockTool)
 
 	// Verify the tool was registered
-	if len(client.tools) != 1 {
-		t.Errorf("Expected 1 registered tool, got %d", len(client.tools))
+	if len(client.Tools) != 1 {
+		t.Errorf("Expected 1 registered tool, got %d", len(client.Tools))
 	}
 
 	// Check if the tool can be retrieved
-	tool, exists := client.tools["test_tool"]
+	tool, exists := client.Tools["test_tool"]
 	if !exists {
 		t.Error("Tool not found in registered tools")
 	}
@@ -105,16 +105,16 @@ func TestSetModel(t *testing.T) {
 	client := NewClient("test-api-key")
 	
 	// Test default model
-	if client.model != "claude-3-sonnet-20240229" {
-		t.Errorf("Expected default model 'claude-3-sonnet-20240229', got '%s'", client.model)
+	if client.Model != "claude-3-sonnet-20240229" {
+		t.Errorf("Expected default model 'claude-3-sonnet-20240229', got '%s'", client.Model)
 	}
 	
 	// Change model
 	client.SetModel("claude-3-opus-20240229")
 	
 	// Verify model was changed
-	if client.model != "claude-3-opus-20240229" {
-		t.Errorf("Expected model 'claude-3-opus-20240229', got '%s'", client.model)
+	if client.Model != "claude-3-opus-20240229" {
+		t.Errorf("Expected model 'claude-3-opus-20240229', got '%s'", client.Model)
 	}
 }
 
@@ -123,16 +123,16 @@ func TestSetMaxTokens(t *testing.T) {
 	client := NewClient("test-api-key")
 	
 	// Test default max tokens
-	if client.maxTokens != 1000 {
-		t.Errorf("Expected default max tokens 1000, got %d", client.maxTokens)
+	if client.MaxTokens != 1000 {
+		t.Errorf("Expected default max tokens 1000, got %d", client.MaxTokens)
 	}
 	
 	// Change max tokens
 	client.SetMaxTokens(2000)
 	
 	// Verify max tokens was changed
-	if client.maxTokens != 2000 {
-		t.Errorf("Expected max tokens 2000, got %d", client.maxTokens)
+	if client.MaxTokens != 2000 {
+		t.Errorf("Expected max tokens 2000, got %d", client.MaxTokens)
 	}
 }
 
@@ -174,10 +174,13 @@ func TestSendMessage(t *testing.T) {
 
 	// Create client with mocked server URL
 	client := NewClient("test-api-key")
-	client.baseURL = server.URL
+	client.BaseURL = server.URL
 
 	// Send a test message
-	response, err := client.SendMessage(context.Background(), "Hello, Claude!")
+	response, err := client.SendMessage(context.Background(), models.Message{
+		Role:    models.RoleUser,
+		Content: "Hello, Claude!",
+	})
 	if err != nil {
 		t.Fatalf("Failed to send message: %v", err)
 	}
@@ -234,7 +237,7 @@ func TestSendMessageWithTools(t *testing.T) {
 
 	// Create client with mocked server URL
 	client := NewClient("test-api-key")
-	client.baseURL = server.URL
+	client.BaseURL = server.URL
 
 	// Register a mock tool
 	mockTool := &MockTool{
@@ -254,7 +257,10 @@ func TestSendMessageWithTools(t *testing.T) {
 	client.RegisterTool(mockTool)
 
 	// Send a test message with tools
-	response, err := client.SendMessageWithTools(context.Background(), "Hello, Claude! Use tools if needed.")
+	response, err := client.SendMessageWithTools(context.Background(), models.Message{
+		Role:    models.RoleUser,
+		Content: "Hello, Claude! Use tools if needed.",
+	})
 	if err != nil {
 		t.Fatalf("Failed to send message with tools: %v", err)
 	}
@@ -289,7 +295,7 @@ func TestHandleToolCall(t *testing.T) {
 
 	// Create client with mocked server URL
 	client := NewClient("test-api-key")
-	client.baseURL = server.URL
+	client.BaseURL = server.URL
 
 	// Register a mock tool
 	mockTool := &MockTool{
@@ -309,7 +315,10 @@ func TestHandleToolCall(t *testing.T) {
 	client.RegisterTool(mockTool)
 
 	// Send a test message that will trigger a tool call
-	response, err := client.SendMessageWithTools(context.Background(), "Use the test_tool please")
+	response, err := client.SendMessageWithTools(context.Background(), models.Message{
+		Role:    models.RoleUser,
+		Content: "Use the test_tool please",
+	})
 	if err != nil {
 		t.Fatalf("Failed to handle tool call: %v", err)
 	}

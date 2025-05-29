@@ -180,7 +180,6 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 			}
 			
 			// Format response as expected by ReAct agent
-			// This is the key modification - format tool calls in the way ReAct expects
 			thoughtText := ""
 			if len(textBlocks) > 0 {
 				thoughtText = "<thought>\n"

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/devOpifex/bond/models"
@@ -323,9 +324,9 @@ func TestHandleToolCall(t *testing.T) {
 		t.Fatalf("Failed to handle tool call: %v", err)
 	}
 
-	// Verify the tool was executed and returned the expected response
-	expected := "MockTool executed successfully"
-	if response != expected {
-		t.Errorf("Expected tool execution result '%s', got '%s'", expected, response)
+	// Our new implementation includes the tool result within a formatted response
+	// Just check that the tool result is contained in the response
+	if !strings.Contains(response, "MockTool executed successfully") {
+		t.Errorf("Response does not contain expected tool execution result: %s", response)
 	}
 }

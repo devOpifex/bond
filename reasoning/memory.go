@@ -1,3 +1,6 @@
+// This file is kept for internal use only
+// Memory is no longer part of the public API
+
 package reasoning
 
 import (
@@ -5,6 +8,7 @@ import (
 )
 
 // Memory provides storage for state between reasoning steps
+// This is an internal implementation detail and should not be used directly
 type Memory struct {
 	mu    sync.RWMutex
 	store map[string]interface{}
@@ -40,23 +44,4 @@ func (m *Memory) GetString(key string) (string, bool) {
 	}
 	str, ok := val.(string)
 	return str, ok
-}
-
-// GetAll returns all memory as a map
-func (m *Memory) GetAll() map[string]interface{} {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	
-	result := make(map[string]interface{})
-	for k, v := range m.store {
-		result[k] = v
-	}
-	return result
-}
-
-// Clear removes all stored values
-func (m *Memory) Clear() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.store = make(map[string]interface{})
 }

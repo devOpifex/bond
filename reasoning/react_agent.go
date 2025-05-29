@@ -44,7 +44,7 @@ func (ra *ReActAgent) SetSystemPrompt(prompt string) {
 	ra.systemPrompt = prompt
 }
 
-// Process implements the Agent interface
+// Process implements the Agent interface and can be used as a step in a Chain
 func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error) {
 	// Reset messages for this new conversation
 	ra.messages = []models.Message{
@@ -139,6 +139,15 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 	}
 
 	return finalResponse, nil
+}
+
+// AsStep returns the ReActAgent as a Chain Step for easy integration
+func (ra *ReActAgent) AsStep(name string, description string) *Step {
+	return &Step{
+		Name:        name,
+		Description: description,
+		Execute:     ra.Process,
+	}
 }
 
 // Helper function to parse the LLM response to extract tool use

@@ -6,7 +6,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/devOpifex/bond/agent"
 	"github.com/devOpifex/bond/models"
@@ -184,115 +183,69 @@ func main() {
 	fmt.Println("-----------------------------------")
 	fmt.Println("Starting multi-step reasoning workflow...")
 
+	// For this example, we'll use a simpler approach
+	// Define variables to store shared data between steps
+	var language, task, code, explanation, performance string
+
 	// Create a workflow for complex multi-step processing
 	workflow := reasoning.NewWorkflow()
 
 	// Step 1: Extract code language and task
-	workflow.AddStep(reasoning.ProcessorStep(
+	workflow.Add(reasoning.WithProcessor(
 		"Extract language and task from query",
 		"Extracts programming language and task description from the user query",
-		func(ctx context.Context, input string, memory *reasoning.Memory) (string, map[string]interface{}, error) {
-			language := extractCodeLanguage(input)
-			task := extractCodeTask(input)
-
-			memory.Set("language", language)
-			memory.Set("task", task)
-
-			return fmt.Sprintf("Language: %s\nTask: %s", language, task),
-				map[string]interface{}{
-					"language": language,
-					"task":     task,
-				}, nil
+		func(ctx context.Context, input string) (string, error) {
+			language = extractCodeLanguage(input)
+			task = extractCodeTask(input)
+			return fmt.Sprintf("Language: %s\nTask: %s", language, task), nil
 		},
 	)).
 	// Step 2: Generate code based on extracted info
-	Then(&reasoning.Step{
-		Name:        "Generate Code",
-		Description: "Generates code in the requested language",
-		Execute: func(ctx context.Context, _ string, memory *reasoning.Memory) (reasoning.StepResult, error) {
-			language, _ := memory.GetString("language")
-			task, _ := memory.GetString("task")
-
+	Then(reasoning.WithProcessor(
+		"Generate Code",
+		"Generates code in the requested language",
+		func(ctx context.Context, _ string) (string, error) {
 			capability := fmt.Sprintf("%s-code", language)
-
-			code, err := agentManager.ProcessWithBestAgent(ctx, capability, task)
-			if err != nil {
-				return reasoning.StepResult{Error: err}, err
-			}
-
-			return reasoning.StepResult{
-				Output: code,
-				Metadata: map[string]interface{}{
-					"language": language,
-				},
-			}, nil
+			var err error
+			code, err = agentManager.ProcessWithBestAgent(ctx, capability, task)
+			return code, err
 		},
-	}).
+	)).
 	// Step 3: Explain the generated code
-	Then(&reasoning.Step{
-		Name:        "Explain Code",
-		Description: "Explains the generated code",
-		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
-			explanation, err := agentManager.ProcessWithBestAgent(ctx, "code-explainer", input)
-			if err != nil {
-				return reasoning.StepResult{Error: err}, err
-			}
-
-			return reasoning.StepResult{
-				Output: explanation,
-			}, nil
+	Then(reasoning.WithProcessor(
+		"Explain Code",
+		"Explains the generated code",
+		func(ctx context.Context, input string) (string, error) {
+			var err error
+			explanation, err = agentManager.ProcessWithBestAgent(ctx, "code-explainer", input)
+			return explanation, err
 		},
-	}).
+	)).
 	// Step 4: Analyze performance
-	Then(&reasoning.Step{
-		Name:        "Analyze Performance",
-		Description: "Analyzes code performance",
-		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
-			language, _ := memory.GetString("language")
-
+	Then(reasoning.WithProcessor(
+		"Analyze Performance",
+		"Analyzes code performance",
+		func(ctx context.Context, input string) (string, error) {
 			analysisInput := fmt.Sprintf("%s\nLanguage: %s", input, language)
-			analysis, err := agentManager.ProcessWithBestAgent(ctx, "benchmark-analyzer", analysisInput)
-			if err != nil {
-				return reasoning.StepResult{Error: err}, err
-			}
-
-			return reasoning.StepResult{
-				Output: analysis,
-			}, nil
+			var err error
+			performance, err = agentManager.ProcessWithBestAgent(ctx, "benchmark-analyzer", analysisInput)
+			return performance, err
 		},
-	}).
+	)).
 	// Step 5: Suggest improvements
-	Then(&reasoning.Step{
-		Name:        "Suggest Improvements",
-		Description: "Suggests improvements to the code",
-		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
-			// We can access outputs from step indexes
-			codeOutput, _ := memory.GetString("step.step_1.output")
-			performanceAnalysis, _ := memory.GetString("step.step_3.output")
-
-			improvementInput := fmt.Sprintf("%s\n\nPerformance Analysis:\n%s", codeOutput, performanceAnalysis)
-			improvements, err := agentManager.ProcessWithBestAgent(ctx, "code-improver", improvementInput)
-			if err != nil {
-				return reasoning.StepResult{Error: err}, err
-			}
-
-			return reasoning.StepResult{
-				Output: improvements,
-			}, nil
+	Then(reasoning.WithProcessor(
+		"Suggest Improvements",
+		"Suggests improvements to the code",
+		func(ctx context.Context, _ string) (string, error) {
+			improvementInput := fmt.Sprintf("%s\n\nPerformance Analysis:\n%s", code, performance)
+			return agentManager.ProcessWithBestAgent(ctx, "code-improver", improvementInput)
 		},
-	}).
+	)).
 	// Step 6: Generate final report
-	Then(&reasoning.Step{
-		Name:        "Generate Report",
-		Description: "Generates final comprehensive report",
-		Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
-			language, _ := memory.GetString("language")
-			task, _ := memory.GetString("task")
-			code, _ := memory.GetString("step.step_1.output")
-			explanation, _ := memory.GetString("step.step_2.output")
-			performance, _ := memory.GetString("step.step_3.output")
-			improvements, _ := memory.GetString("step.step_4.output")
-
+	Then(reasoning.WithProcessor(
+		"Generate Report",
+		"Generates final comprehensive report",
+		func(ctx context.Context, improvements string) (string, error) {
 			report := fmt.Sprintf(
 				"# Code Solution Report\n\n"+
 					"## Task\n%s\n\n"+
@@ -302,15 +255,9 @@ func main() {
 					"## Suggested Improvements\n%s\n\n",
 				task, strings.Title(language), code, explanation, performance, improvements,
 			)
-
-			return reasoning.StepResult{
-				Output: report,
-				Metadata: map[string]interface{}{
-					"timestamp": time.Now().Format(time.RFC3339),
-				},
-			}, nil
+			return report, nil
 		},
-	})
+	))
 
 	// Execute the workflow
 	result, err := workflow.Execute(ctx, userQuery)

@@ -8,73 +8,44 @@ import (
 	"github.com/devOpifex/bond/models"
 )
 
-// AgentStep creates a reasoning step that uses an agent
-func AgentStep(name string, description string, capability string, agentManager *agent.AgentManager) *Step {
+// WithAgent creates a reasoning step that uses an agent
+func WithAgent(name string, description string, capability string, agentManager *agent.AgentManager) *Step {
 	return &Step{
 		Name:        name,
 		Description: description,
-		Execute: func(ctx context.Context, input string, memory *Memory) (StepResult, error) {
-			output, err := agentManager.ProcessWithBestAgent(ctx, capability, input)
-			if err != nil {
-				return StepResult{Error: err}, err
-			}
-
-			return StepResult{
-				Output: output,
-				Metadata: map[string]interface{}{
-					"capability": capability,
-				},
-			}, nil
+		Execute: func(ctx context.Context, input string) (string, error) {
+			return agentManager.ProcessWithBestAgent(ctx, capability, input)
 		},
 	}
 }
 
-// ProviderStep creates a reasoning step that uses an AI provider directly
-func ProviderStep(name string, description string, promptTemplate string, provider models.Provider) *Step {
+// WithProvider creates a reasoning step that uses an AI provider directly
+func WithProvider(name string, description string, promptTemplate string, provider models.Provider) *Step {
 	return &Step{
 		Name:        name,
 		Description: description,
-		Execute: func(ctx context.Context, input string, memory *Memory) (StepResult, error) {
+		Execute: func(ctx context.Context, input string) (string, error) {
 			// Apply the template to the input
 			prompt := fmt.Sprintf(promptTemplate, input)
-			
+
 			// Send to provider
-			output, err := provider.SendMessage(ctx, models.Message{
+			return provider.SendMessage(ctx, models.Message{
 				Role:    models.RoleUser,
 				Content: prompt,
 			})
-			if err != nil {
-				return StepResult{Error: err}, err
-			}
-
-			return StepResult{
-				Output: output,
-				Metadata: map[string]interface{}{
-					"prompt": prompt,
-				},
-			}, nil
 		},
 	}
 }
 
-// MemoryProcessor is a function that processes data from memory
-type MemoryProcessor func(ctx context.Context, input string, memory *Memory) (string, map[string]interface{}, error)
+// Processor is a function that processes input data
+type Processor func(ctx context.Context, input string) (string, error)
 
-// ProcessorStep creates a reasoning step that runs a custom processor function
-func ProcessorStep(name string, description string, processor MemoryProcessor) *Step {
+// WithProcessor creates a reasoning step that runs a custom processor function
+func WithProcessor(name string, description string, processor Processor) *Step {
 	return &Step{
 		Name:        name,
 		Description: description,
-		Execute: func(ctx context.Context, input string, memory *Memory) (StepResult, error) {
-			output, metadata, err := processor(ctx, input, memory)
-			if err != nil {
-				return StepResult{Error: err}, err
-			}
-
-			return StepResult{
-				Output:   output,
-				Metadata: metadata,
-			}, nil
-		},
+		Execute:     processor,
 	}
 }
+

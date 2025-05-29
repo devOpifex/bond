@@ -1,18 +1,8 @@
 # Bond Reasoning
 
-The `reasoning` package extends Bond with multi-step reasoning capabilities, allowing agents to break down complex tasks into a series of steps with state management.
+The `reasoning` package extends Bond with multi-step reasoning capabilities, allowing agents to break down complex tasks into a series of steps.
 
 ## Key Components
-
-### Memory
-
-Provides a thread-safe key-value store for maintaining state between reasoning steps:
-
-```go
-memory := reasoning.NewMemory()
-memory.Set("key", "value")
-value, exists := memory.GetString("key")
-```
 
 ### Step
 
@@ -22,14 +12,9 @@ Represents a single reasoning step:
 step := &reasoning.Step{
     Name:        "Step Name",
     Description: "Step description",
-    Execute: func(ctx context.Context, input string, memory *reasoning.Memory) (reasoning.StepResult, error) {
+    Execute: func(ctx context.Context, input string) (string, error) {
         // Process input and return results
-        return reasoning.StepResult{
-            Output: "Step output",
-            Metadata: map[string]interface{}{
-                "key": "value",
-            },
-        }, nil
+        return "Step output", nil
     },
 }
 ```
@@ -40,18 +25,8 @@ A linear sequence of steps executed in order, where each step's output becomes t
 
 ```go
 chain := reasoning.NewChain()
-chain.AddStep(step1).Then(step2)  // Method chaining supported
+chain.Add(step1).Then(step2)  // Method chaining supported
 result, err := chain.Execute(ctx, "initial input")
-```
-
-### Workflow
-
-A simplified sequence of steps that is equivalent to a Chain:
-
-```go
-workflow := reasoning.NewWorkflow()
-workflow.AddStep(step1).Then(step2)  // Method chaining supported
-result, err := workflow.Execute(ctx, "initial input")
 ```
 
 ### ReActAgent
@@ -65,14 +40,14 @@ reactAgent.RegisterTool(someTool)
 result, err := reactAgent.Process(ctx, "Solve this problem...")
 ```
 
-## Adapters
+## Step Creators
 
-The package provides adapters to integrate with Bond agents and providers:
+The package provides factory functions to easily create steps:
 
-### Agent Adapter
+### WithAgent
 
 ```go
-step := reasoning.AgentStep(
+step := reasoning.WithAgent(
     "Step Name",
     "Step description",
     "agent-capability",
@@ -80,10 +55,10 @@ step := reasoning.AgentStep(
 )
 ```
 
-### Provider Adapter
+### WithProvider
 
 ```go
-step := reasoning.ProviderStep(
+step := reasoning.WithProvider(
     "Step Name",
     "Step description",
     "Prompt template with %s placeholder",
@@ -91,47 +66,57 @@ step := reasoning.ProviderStep(
 )
 ```
 
-### Processor Adapter
+### WithProcessor
 
 ```go
-step := reasoning.ProcessorStep(
+step := reasoning.WithProcessor(
     "Step Name",
     "Step description",
-    func(ctx context.Context, input string, memory *reasoning.Memory) (string, map[string]interface{}, error) {
+    func(ctx context.Context, input string) (string, error) {
         // Custom processing logic
-        return "output", map[string]interface{}{"key": "value"}, nil
+        return "processed output", nil
     },
 )
 ```
 
 ## Example Usage
 
-See the `/examples/react/main.go` for a complete example of using the ReAct agent with tools.
-
-### Accessing Step Outputs
-
-You can access step outputs using automatically generated step IDs:
+See the `/examples/simple_chain/main.go` for a complete example of using the simplified Chain API.
 
 ```go
-// Access the output of the first step (index 0)
-firstStepOutput, _ := memory.GetString("step.step_0.output")
+// Create a chain
+chain := reasoning.NewChain()
 
-// Access the output of the second step (index 1)
-secondStepOutput, _ := memory.GetString("step.step_1.output")
+// Add steps using the simplified API
+chain.Add(reasoning.WithProcessor(
+    "Extract entities", 
+    "Extracts entities from text",
+    func(ctx context.Context, input string) (string, error) {
+        // Process input
+        return "Extracted entities: X, Y, Z", nil
+    },
+)).
+Then(reasoning.WithProvider(
+    "Analyze sentiment",
+    "Analyzes the sentiment of the input",
+    "Analyze the sentiment of this text: %s",
+    provider,
+))
+
+// Execute the chain
+result, err := chain.Execute(context.Background(), "Your input text here")
 ```
 
-Key benefits of the multi-step approach:
+Key benefits of the simplified approach:
 
-1. **State Management**: Pass information between steps
-2. **Sequential Execution**: Clear, readable flow of operations
-3. **Result Reuse**: Access outputs from any previous step
-4. **Composability**: Build complex workflows from simpler steps
-5. **Fluent API**: Method chaining for more readable code
+1. **Simplicity**: Focused on the core task of chaining operations
+2. **Clarity**: Each step has a clear input and output
+3. **Composability**: Build complex workflows from simpler steps
+4. **Fluent API**: Method chaining for more readable code
 
 ## Best Practices
 
 1. Keep each step focused on a single responsibility
-2. Store intermediate results in memory for sharing between steps
-3. Use metadata to capture additional information beyond the primary output
-4. Handle errors appropriately at each step
-5. Use the fluent API with method chaining for more readable code
+2. Create reusable steps for common operations
+3. Handle errors appropriately at each step
+4. Use the fluent API with method chaining for more readable code

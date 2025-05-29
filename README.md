@@ -354,3 +354,90 @@ The reasoning package provides:
 - **Custom processors**: Implement custom logic in any step
 
 See the `examples/code/main.go` for a complete example of using multi-step reasoning for a complex code generation and analysis task.
+
+## Adding Support for a New Provider
+
+Bond is designed to be extensible, making it easy to add support for new AI providers. Here's how to implement a new provider:
+
+1. **Create a new package** under the `providers` directory with your provider's name
+2. **Implement the `models.Provider` interface** from `models/interfaces.go`:
+   - `SendMessage`: Send a simple message to the provider
+   - `SendMessageWithTools`: Send a message that might use tools
+   - `RegisterTool`: Add a tool to the provider
+   - `SetSystemPrompt`: Configure the system prompt
+   - `SetModel`: Configure which model to use
+   - `SetMaxTokens`: Configure max response tokens
+
+### Example Implementation Structure
+
+```go
+package myprovider
+
+import (
+	"context"
+	"github.com/devOpifex/bond/models"
+	"github.com/devOpifex/bond/providers/common"
+)
+
+// Client implements the models.Provider interface
+type Client struct {
+	apiKey     string
+	model      string
+	maxTokens  int
+	systemPrompt string
+	tools      []models.ToolExecutor
+	httpClient *common.Client
+}
+
+// NewClient creates a new client for MyProvider
+func NewClient(apiKey string) *Client {
+	return &Client{
+		apiKey:     apiKey,
+		model:      "default-model",
+		maxTokens:  1000,
+		httpClient: common.NewClient(),
+		tools:      []models.ToolExecutor{},
+	}
+}
+
+// Implement all required interface methods
+func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
+	// Implementation details...
+}
+
+func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
+	// Implementation details...
+}
+
+func (c *Client) RegisterTool(tool models.ToolExecutor) {
+	c.tools = append(c.tools, tool)
+}
+
+func (c *Client) SetSystemPrompt(prompt string) {
+	c.systemPrompt = prompt
+}
+
+func (c *Client) SetModel(model string) {
+	c.model = model
+}
+
+func (c *Client) SetMaxTokens(tokens int) {
+	c.maxTokens = tokens
+}
+```
+
+### Implementation Tips
+
+1. Use the `common.Client` for HTTP requests to ensure proper timeouts and error handling
+2. Study the existing providers (Claude, OpenAI) to understand how they handle message formatting and tool execution
+3. Write tests to ensure your provider behaves correctly (see `claude_test.go` for examples)
+4. Document provider-specific features or limitations in a README.md file within your provider's package
+
+Once implemented, users can create instances of your provider just like the built-in ones:
+
+```go
+provider := myprovider.NewClient("your-api-key")
+provider.SetModel("your-model-name")
+provider.RegisterTool(myTool)
+response, err := provider.SendMessageWithTools(ctx, message)
+```

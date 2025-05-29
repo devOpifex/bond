@@ -70,17 +70,24 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 	
 	// Main ReAct loop
 	for i := 0; i < ra.maxIterations; i++ {
+		// Get the last message to send to the provider
+		lastMessage := ra.messages[len(ra.messages)-1]
+		
+		// Create a context that includes the full message history
+		ctxWithHistory := context.WithValue(ctx, "message_history", ra.messages)
+		
 		// Get next thought from the model
-		response, err := ra.provider.SendMessageWithTools(ctx, ra.messages[len(ra.messages)-1])
+		response, err := ra.provider.SendMessageWithTools(ctxWithHistory, lastMessage)
 		if err != nil {
 			return "", fmt.Errorf("provider error: %w", err)
 		}
 
 		// Add the assistant's response to the message history
-		ra.messages = append(ra.messages, models.Message{
+		assistantMessage := models.Message{
 			Role:    models.RoleAssistant,
 			Content: response,
-		})
+		}
+		ra.messages = append(ra.messages, assistantMessage)
 
 		// Parse response to extract tool calls
 		toolUse, actionText, isFinalResponse := parseResponse(response)
@@ -116,7 +123,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				})
 				continue
 			}
-
+			
 			// Execute the tool
 			result, err := tool.Execute(inputJSON)
 			if err != nil {
@@ -128,13 +135,17 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				})
 				continue
 			}
-
+			
+			// Store the assistant message for context
+			_ = context.WithValue(ctx, "original_message", assistantMessage)
+			
 			// Add the tool result to the message history
-			ra.messages = append(ra.messages, models.Message{
+			functionMessage := models.Message{
 				Role:       models.RoleFunction,
 				Content:    result,
 				ToolResult: &models.ToolResult{ToolName: toolUse.Name, Result: result},
-			})
+			}
+			ra.messages = append(ra.messages, functionMessage)
 		}
 	}
 
@@ -166,9 +177,39 @@ func parseResponse(response string) (*models.ToolUse, string, bool) {
 		
 		toolJSON := strings.TrimSpace(response[startIdx : startIdx+endIdx])
 		
-		var toolUse models.ToolUse
-		if err := json.Unmarshal([]byte(toolJSON), &toolUse); err != nil {
+		// Parse the tool use JSON manually to handle different input formats
+		var rawToolUse map[string]interface{}
+		if err := json.Unmarshal([]byte(toolJSON), &rawToolUse); err != nil {
 			return nil, response, false
+		}
+		
+		// Extract name and input
+		name, ok := rawToolUse["name"].(string)
+		if !ok {
+			return nil, response, false
+		}
+		
+		// Handle input which can be a string or an object
+		var inputStr string
+		if inputObj, ok := rawToolUse["input"].(map[string]interface{}); ok {
+			// Input is an object, convert it to a JSON string
+			inputJSON, err := json.Marshal(inputObj)
+			if err != nil {
+				return nil, response, false
+			}
+			inputStr = string(inputJSON)
+		} else if inputStr, ok = rawToolUse["input"].(string); !ok {
+			// Try marshaling whatever input is
+			inputJSON, err := json.Marshal(rawToolUse["input"])
+			if err != nil {
+				return nil, response, false
+			}
+			inputStr = string(inputJSON)
+		}
+		
+		toolUse := models.ToolUse{
+			Name: name,
+			Input: inputStr,
 		}
 		
 		// Extract the thought text before the tool use

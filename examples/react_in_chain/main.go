@@ -3,66 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/devOpifex/bond/models"
+	"github.com/devOpifex/bond/providers/claude"
 	"github.com/devOpifex/bond/reasoning"
 	"github.com/devOpifex/bond/tools"
 )
 
-// MockProvider simulates a provider for demonstration purposes
-type MockProvider struct {
-	systemPrompt string
-	tools        map[string]models.ToolExecutor
-	callCount    int
-}
-
-func NewMockProvider() *MockProvider {
-	return &MockProvider{
-		tools:     make(map[string]models.ToolExecutor),
-		callCount: 0,
-	}
-}
-
-func (m *MockProvider) SetSystemPrompt(prompt string) {
-	m.systemPrompt = prompt
-}
-
-func (m *MockProvider) SetModel(model string) {}
-
-func (m *MockProvider) SetMaxTokens(tokens int) {}
-
-func (m *MockProvider) RegisterTool(tool models.ToolExecutor) {
-	m.tools[tool.GetName()] = tool
-}
-
-func (m *MockProvider) SendMessage(ctx context.Context, message models.Message) (string, error) {
-	return "This is a mock response", nil
-}
-
-func (m *MockProvider) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
-	m.callCount++
-
-	// First call - simulate reasoning and tool use for calculator
-	if m.callCount == 1 {
-		return `<thought>
-I need to calculate what 21 + 21 equals. I can use the calculator tool for this.
-</thought>
-
-` + "```json" + `
-{
-  "name": "calculator",
-  "input": "{\"expression\": \"21 + 21\"}"
-}
-` + "```", nil
-	}
-
-	// Second call - simulate final response
-	return "Based on the calculator's result, 21 + 21 = 42.", nil
-}
-
 func main() {
-	// Create a mock provider
-	provider := NewMockProvider()
+	// Get API key from environment variable
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		fmt.Println("Error: ANTHROPIC_API_KEY environment variable is not set")
+		return
+	}
+
+	// Create a Claude provider
+	provider := claude.NewClient(apiKey)
 
 	// Create a ReAct agent with tools
 	reactAgent := reasoning.NewReActAgent(provider)
@@ -123,6 +81,6 @@ func main() {
 
 	fmt.Println(result)
 
-	// Print the message trace statistics for analysis
-	fmt.Printf("Total provider calls: %d\n", provider.callCount)
+	// The Claude provider doesn't expose a call count directly
+	fmt.Println("Chain execution completed")
 }

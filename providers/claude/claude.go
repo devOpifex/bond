@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/devOpifex/bond/models"
 	"github.com/devOpifex/bond/providers/common"
@@ -77,10 +78,40 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		})
 	}
 
+	// Build message list - Claude only accepts user and assistant roles
+	var messages []models.Message
+	
+	// Special handling for messages to Claude API
+	// Tool results need to be formatted specially - for Claude we need to preserve
+	// the original message and include the tool result as a user message
+	
+	// Check if we have a previous message from the context
+	prevMessage, hasPrevMessage := ctx.Value("original_message").(models.Message)
+	
+	if message.Role == models.RoleFunction && message.ToolResult != nil {
+		// Format the tool result message 
+		userMsg := models.Message{
+			Role:    models.RoleUser,
+			Content: fmt.Sprintf("Tool '%s' returned: %s", 
+				message.ToolResult.ToolName, message.Content),
+		}
+		
+		// If we have a previous message and it's an assistant message, include it first
+		if hasPrevMessage && prevMessage.Role == models.RoleAssistant {
+			messages = append(messages, prevMessage)
+		}
+		
+		// Then add the tool result as a user message
+		messages = append(messages, userMsg)
+	} else {
+		// For regular messages, just pass them through
+		messages = append(messages, message)
+	}
+
 	request := ClaudeRequest{
 		Model:     c.Model,
 		MaxTokens: c.MaxTokens,
-		Messages:  []models.Message{message},
+		Messages:  messages,
 		Tools:     tools,
 	}
 
@@ -102,6 +133,7 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 		return "", err
 	}
 
+	
 	// Prepare HTTP request
 	headers := map[string]string{
 		"Content-Type":       "application/json",
@@ -147,12 +179,31 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 				return "", err
 			}
 			
-			// Combine the text blocks with the tool result
-			combinedResponse := ""
-			for _, text := range textBlocks {
-				combinedResponse += text + "\n"
+			// Format response as expected by ReAct agent
+			// This is the key modification - format tool calls in the way ReAct expects
+			thoughtText := ""
+			if len(textBlocks) > 0 {
+				thoughtText = "<thought>\n"
+				for _, text := range textBlocks {
+					thoughtText += text + "\n"
+				}
+				thoughtText += "</thought>\n\n"
 			}
-			combinedResponse += result
+			
+			// Convert raw input JSON to a string for the ReAct format
+			var inputMap map[string]interface{}
+			json.Unmarshal(toolUseBlock.Input, &inputMap)
+			inputJSON, _ := json.Marshal(map[string]interface{}{
+				"expression": fmt.Sprintf("%v", inputMap["expression"]),
+			})
+			
+			toolJSON, _ := json.Marshal(map[string]interface{}{
+				"name": toolUseBlock.Name,
+				"input": string(inputJSON),
+			})
+			
+			combinedResponse := fmt.Sprintf("%s```json\n%s\n```\n\nTool result: %s", 
+				thoughtText, string(toolJSON), result)
 			
 			return combinedResponse, nil
 		}

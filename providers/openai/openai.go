@@ -1,3 +1,7 @@
+// Package openai implements the OpenAI API integration for the Bond framework.
+// It provides a client for communicating with OpenAI models like GPT-4,
+// handling message formatting, tool calls, and response parsing according
+// to OpenAI's specific API requirements.
 package openai
 
 import (
@@ -75,12 +79,16 @@ type OpenAIFuncCall struct {
 	Arguments string `json:"arguments"`
 }
 
-// Client is the OpenAI API client implementation
+// Client is the OpenAI API client implementation.
+// It handles communication with the OpenAI API, including authentication,
+// request formatting, and response parsing. It implements the models.Provider interface.
 type Client struct {
 	common.BaseClient
 }
 
-// NewClient creates a new OpenAI client
+// NewClient creates a new OpenAI client with the provided API key.
+// It initializes the client with default settings for the OpenAI API,
+// including the base URL and default model (gpt-4o).
 func NewClient(apiKey string) *Client {
 	baseClient := common.NewBaseClient(
 		apiKey,
@@ -93,7 +101,9 @@ func NewClient(apiKey string) *Client {
 	}
 }
 
-// SendMessage sends a message with specified role to OpenAI
+// SendMessage sends a message with specified role to OpenAI and returns the response.
+// This implements part of the models.Provider interface for basic message exchange
+// without tool capabilities.
 func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	var messages []OpenAIMessage
 	
@@ -121,7 +131,9 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 	return c.sendRequest(ctx, request)
 }
 
-// convertToolSchema converts our schema format to OpenAI's format
+// convertToolSchema converts our schema format to OpenAI's JSON Schema format.
+// OpenAI expects tool parameters in JSON Schema format, which differs slightly
+// from our internal representation. This function handles the conversion.
 func convertToolSchema(schema models.InputSchema) (json.RawMessage, error) {
 	// OpenAI expects a JSON Schema format
 	openaiSchema := map[string]interface{}{
@@ -146,7 +158,9 @@ func convertToolSchema(schema models.InputSchema) (json.RawMessage, error) {
 	return json.Marshal(openaiSchema)
 }
 
-// SendMessageWithTools sends a message with specified role to OpenAI with registered tools
+// SendMessageWithTools sends a message with specified role to OpenAI with registered tools.
+// This implements part of the models.Provider interface for advanced interactions
+// where the model may need to call tools during its reasoning process.
 func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
 	// Convert registered tools to OpenAI tool format
 	var tools []OpenAITool
@@ -195,7 +209,9 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	return c.sendRequest(ctx, request)
 }
 
-// sendRequest sends a request to the OpenAI API
+// sendRequest sends a request to the OpenAI API and processes the response.
+// It handles the HTTP communication, error handling, and response parsing.
+// If OpenAI requests a tool, it manages the tool execution and returns the result.
 func (c *Client) sendRequest(ctx context.Context, request OpenAIRequest) (string, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {

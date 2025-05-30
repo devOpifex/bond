@@ -1,3 +1,7 @@
+// Package reasoning implements high-level reasoning patterns and workflows for AI agents.
+// It provides structured approaches for complex AI behaviors like step-by-step reasoning,
+// tool usage, and multi-step reasoning chains. This package builds upon the provider
+// layer to enable more sophisticated agent behaviors.
 package reasoning
 
 import (
@@ -9,16 +13,30 @@ import (
 	"github.com/devOpifex/bond/models"
 )
 
-// ReActAgent implements a Reasoning + Acting agent
+// ReActAgent implements the Reasoning + Acting (ReAct) pattern for AI agents.
+// This pattern involves alternating between reasoning about a problem and taking
+// actions (using tools) to gather information or make progress toward a solution.
+// The ReActAgent manages the cycle of reasoning, tool selection, and tool execution.
 type ReActAgent struct {
-	provider      models.Provider
-	tools         map[string]models.ToolExecutor
+	// provider is the LLM provider that handles communication with the AI model
+	provider models.Provider
+	
+	// tools is a registry of available tools that the agent can use
+	tools map[string]models.ToolExecutor
+	
+	// maxIterations limits the number of reasoning-action cycles to prevent infinite loops
 	maxIterations int
-	systemPrompt  string
-	messages      []models.Message
+	
+	// systemPrompt contains instructions that guide the AI model's behavior
+	systemPrompt string
+	
+	// messages stores the conversation history for context
+	messages []models.Message
 }
 
-// NewReActAgent creates a new ReAct agent
+// NewReActAgent creates a new ReAct agent with the specified provider.
+// It initializes the agent with default settings that can be customized
+// through the SetMaxIterations and SetSystemPrompt methods.
 func NewReActAgent(provider models.Provider) *ReActAgent {
 	return &ReActAgent{
 		provider:      provider,
@@ -29,22 +47,31 @@ func NewReActAgent(provider models.Provider) *ReActAgent {
 	}
 }
 
-// RegisterTool adds a tool to the agent
+// RegisterTool adds a tool to the agent's available tools.
+// The tool is stored in the agent's tool registry and will be
+// available for the AI model to use during reasoning.
 func (ra *ReActAgent) RegisterTool(tool models.ToolExecutor) {
 	ra.tools[tool.GetName()] = tool
 }
 
-// SetMaxIterations configures the maximum number of reasoning-action cycles
+// SetMaxIterations configures the maximum number of reasoning-action cycles.
+// This prevents the agent from getting stuck in infinite loops by limiting
+// how many times it can go through the reasoning-action cycle.
 func (ra *ReActAgent) SetMaxIterations(iterations int) {
 	ra.maxIterations = iterations
 }
 
-// SetSystemPrompt overrides the default system prompt
+// SetSystemPrompt overrides the default system prompt with a custom one.
+// The system prompt provides instructions to the AI model about how to
+// behave and how to structure its responses.
 func (ra *ReActAgent) SetSystemPrompt(prompt string) {
 	ra.systemPrompt = prompt
 }
 
-// Process implements the Agent interface and can be used as a step in a Chain
+// Process implements the Agent interface and can be used as a step in a Chain.
+// It executes the ReAct pattern, alternating between model reasoning and tool execution
+// until a final response is reached or the maximum iterations limit is hit.
+// This method handles the entire conversation flow, tool execution, and context management.
 func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error) {
 	// Reset messages for this new conversation
 	ra.messages = []models.Message{
@@ -152,7 +179,9 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 	return finalResponse, nil
 }
 
-// AsStep returns the ReActAgent as a Chain Step for easy integration
+// AsStep returns the ReActAgent as a Chain Step for easy integration into workflows.
+// This allows the ReAct agent to be used as a component in a larger reasoning pipeline.
+// The name and description parameters are used to identify the step in the chain.
 func (ra *ReActAgent) AsStep(name string, description string) *Step {
 	return &Step{
 		Name:        name,
@@ -161,7 +190,11 @@ func (ra *ReActAgent) AsStep(name string, description string) *Step {
 	}
 }
 
-// Helper function to parse the LLM response to extract tool use
+// parseResponse extracts tool use information from an LLM response.
+// It returns:
+// - A ToolUse pointer if the response contains a tool call (nil otherwise)
+// - The text content from the response (thought text or final answer)
+// - A boolean indicating if this is a final response (true) or if it requires tool use (false)
 func parseResponse(response string) (*models.ToolUse, string, bool) {
 	// Simple parsing - in a real implementation, this would be more robust
 	if strings.Contains(response, "```json") && strings.Contains(response, "\"name\":") {

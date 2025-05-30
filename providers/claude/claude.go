@@ -1,3 +1,6 @@
+// Package claude implements the Anthropic Claude API integration for the Bond framework.
+// It provides a client for communicating with Claude models, handling message formatting,
+// tool calls, and response parsing according to Claude's specific API requirements.
 package claude
 
 import (
@@ -9,35 +12,60 @@ import (
 	"github.com/devOpifex/bond/providers/common"
 )
 
-// ClaudeRequest represents a request to the Claude API
+// ClaudeRequest represents a request to the Claude API.
+// It follows the structure expected by Anthropic's Messages API.
 type ClaudeRequest struct {
-	Model     string           `json:"model"`
-	MaxTokens int              `json:"max_tokens"`
-	System    string           `json:"system,omitempty"`
-	Messages  []models.Message `json:"messages"`
-	Tools     []models.Tool    `json:"tools,omitempty"`
+	// Model specifies which Claude model version to use
+	Model string `json:"model"`
+	
+	// MaxTokens limits the length of the response
+	MaxTokens int `json:"max_tokens"`
+	
+	// System contains instructions that guide Claude's behavior
+	System string `json:"system,omitempty"`
+	
+	// Messages contains the conversation history
+	Messages []models.Message `json:"messages"`
+	
+	// Tools defines functions that Claude can call
+	Tools []models.Tool `json:"tools,omitempty"`
 }
 
-// ClaudeResponse represents a response from the Claude API
+// ClaudeResponse represents a response from the Claude API.
+// It contains content blocks and metadata about why the response ended.
 type ClaudeResponse struct {
-	Content    []ContentBlock `json:"content"`
-	StopReason string         `json:"stop_reason"`
+	// Content contains the response blocks (text or tool calls)
+	Content []ContentBlock `json:"content"`
+	
+	// StopReason indicates why Claude stopped generating (length, tool_use, etc.)
+	StopReason string `json:"stop_reason"`
 }
 
-// ContentBlock represents a content block in a Claude response
+// ContentBlock represents a single block in a Claude response.
+// It can be either text content or a tool use request.
 type ContentBlock struct {
-	Type  string          `json:"type"`
-	Text  string          `json:"text,omitempty"`
-	Name  string          `json:"name,omitempty"`
+	// Type indicates the block type ("text" or "tool_use")
+	Type string `json:"type"`
+	
+	// Text contains the response text for text blocks
+	Text string `json:"text,omitempty"`
+	
+	// Name contains the tool name for tool_use blocks
+	Name string `json:"name,omitempty"`
+	
+	// Input contains the parameters for tool calls
 	Input json.RawMessage `json:"input,omitempty"`
 }
 
-// Client is the Claude API client implementation
+// Client is the Claude API client implementation.
+// It handles communication with the Anthropic API, including authentication,
+// request formatting, and response parsing. It implements the models.Provider interface.
 type Client struct {
 	common.BaseClient
 }
 
-// NewClient creates a new Claude client
+// NewClient creates a new Claude client with the provided API key.
+// It initializes the client with default settings for the Claude API.
 func NewClient(apiKey string) *Client {
 	baseClient := common.NewBaseClient(
 		apiKey,
@@ -50,7 +78,9 @@ func NewClient(apiKey string) *Client {
 	}
 }
 
-// SendMessage sends a message with specified role to Claude
+// SendMessage sends a message with specified role to Claude and returns the response.
+// This implements part of the models.Provider interface for basic message exchange
+// without tool capabilities.
 func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	request := ClaudeRequest{
 		Model:     c.Model,
@@ -66,7 +96,9 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 	return c.sendRequest(ctx, request)
 }
 
-// SendMessageWithTools sends a message with specified role to Claude with registered tools
+// SendMessageWithTools sends a message with specified role to Claude with registered tools.
+// This implements part of the models.Provider interface for advanced interactions
+// where the model may need to call tools during its reasoning process.
 func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
 	// Convert registered tools to Claude tool format
 	var tools []models.Tool
@@ -126,7 +158,9 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	return c.sendRequest(ctx, request)
 }
 
-// sendRequest sends a request to the Claude API
+// sendRequest sends a request to the Claude API and processes the response.
+// It handles the HTTP communication, error handling, and response parsing.
+// If Claude requests a tool, it manages the tool execution and formats the result.
 func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string, error) {
 	jsonData, err := json.Marshal(request)
 	if err != nil {

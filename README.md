@@ -1,5 +1,7 @@
 # Bond
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/devOpifex/bond.svg)](https://pkg.go.dev/github.com/devOpifex/bond)
+
 Bond is a Go package for building and managing AI assistant tools and agents, with a focus on extensibility and ease of use.
 
 ## Overview

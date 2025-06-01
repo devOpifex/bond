@@ -75,10 +75,8 @@ func (ra *ReActAgent) SetSystemPrompt(prompt string) {
 func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error) {
 	// Reset messages for this new conversation
 	ra.messages = []models.Message{
-		{
-			Role:    models.RoleSystem,
-			Content: ra.systemPrompt,
-		},
+		// Don't include system message in the messages array
+		// System prompt is set separately on the provider
 		{
 			Role:    models.RoleUser,
 			Content: input,

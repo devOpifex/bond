@@ -57,6 +57,10 @@ func TestNewClient(t *testing.T) {
 	if client.MaxTokens != 1000 {
 		t.Errorf("Expected default max tokens 1000, got %d", client.MaxTokens)
 	}
+	
+	if client.Temperature != 0.7 {
+		t.Errorf("Expected default temperature 0.7, got %f", client.Temperature)
+	}
 
 	if len(client.Tools) != 0 {
 		t.Errorf("Expected empty tools map, got %d tools", len(client.Tools))
@@ -134,6 +138,24 @@ func TestSetMaxTokens(t *testing.T) {
 	// Verify max tokens was changed
 	if client.MaxTokens != 2000 {
 		t.Errorf("Expected max tokens 2000, got %d", client.MaxTokens)
+	}
+}
+
+// TestSetTemperature tests temperature configuration
+func TestSetTemperature(t *testing.T) {
+	client := NewClient("test-api-key")
+	
+	// Test default temperature
+	if client.Temperature != 0.7 {
+		t.Errorf("Expected default temperature 0.7, got %f", client.Temperature)
+	}
+	
+	// Change temperature
+	client.SetTemperature(0.2)
+	
+	// Verify temperature was changed
+	if client.Temperature != 0.2 {
+		t.Errorf("Expected temperature 0.2, got %f", client.Temperature)
 	}
 }
 

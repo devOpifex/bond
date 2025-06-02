@@ -29,6 +29,10 @@ type ClaudeRequest struct {
 
 	// Tools defines functions that Claude can call
 	Tools []models.Tool `json:"tools,omitempty"`
+	
+	// Temperature controls randomness in Claude's response generation
+	// Higher values make output more random, lower values make it more deterministic
+	Temperature float64 `json:"temperature,omitempty"`
 }
 
 // ClaudeResponse represents a response from the Claude API.
@@ -93,7 +97,7 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 
 	// Add the current message to history
 	messageHistory = append(messageHistory, message)
-	
+
 	// Create a clean message list for Claude with only supported roles (user/assistant)
 	var cleanMessages []models.Message
 	for _, msg := range messageHistory {
@@ -104,9 +108,10 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 	}
 
 	request := ClaudeRequest{
-		Model:     c.Model,
-		MaxTokens: c.MaxTokens,
-		Messages:  cleanMessages,
+		Model:       c.Model,
+		MaxTokens:   c.MaxTokens,
+		Messages:    cleanMessages,
+		Temperature: c.Temperature,
 	}
 
 	// Add system prompt if set
@@ -160,7 +165,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		// For regular messages, add to history
 		messageHistory = append(messageHistory, message)
 	}
-	
+
 	// Create a clean message list for Claude with only supported roles (user/assistant)
 	var cleanMessages []models.Message
 	for _, msg := range messageHistory {
@@ -171,10 +176,11 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	}
 
 	request := ClaudeRequest{
-		Model:     c.Model,
-		MaxTokens: c.MaxTokens,
-		Messages:  cleanMessages,
-		Tools:     tools,
+		Model:       c.Model,
+		MaxTokens:   c.MaxTokens,
+		Messages:    cleanMessages,
+		Tools:       tools,
+		Temperature: c.Temperature,
 	}
 
 	// Add system prompt if set
@@ -318,4 +324,3 @@ func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string
 
 	return "No response received", nil
 }
-

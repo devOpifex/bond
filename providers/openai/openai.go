@@ -125,7 +125,7 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 		Model:       c.Model,
 		MaxTokens:   c.MaxTokens,
 		Messages:    messages,
-		Temperature: 0.7,
+		Temperature: c.Temperature,
 	}
 
 	return c.sendRequest(ctx, request)
@@ -203,7 +203,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		Messages:    messages,
 		Tools:       tools,
 		ToolChoice:  "auto",
-		Temperature: 0.7,
+		Temperature: c.Temperature,
 	}
 
 	return c.sendRequest(ctx, request)

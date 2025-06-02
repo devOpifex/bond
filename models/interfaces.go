@@ -52,6 +52,11 @@ type Provider interface {
 	// SetMaxTokens configures the maximum number of tokens that the model should
 	// generate in its response.
 	SetMaxTokens(tokens int)
+	
+	// SetTemperature configures the temperature parameter for the model's response generation.
+	// Higher values (e.g., 0.8) make output more random, while lower values (e.g., 0.2)
+	// make it more deterministic. Range is typically 0.0-1.0.
+	SetTemperature(temperature float64)
 }
 
 // Agent defines the interface that all AI agents must implement.

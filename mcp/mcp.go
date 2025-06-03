@@ -40,6 +40,7 @@ type MCP struct {
 	defaultTimeout time.Duration
 	handlers       map[string]ResponseHandler
 	handlersMtx    sync.RWMutex
+	ioMutex        sync.Mutex // Protects stdout/stderr access
 }
 
 // NewMCP creates a new MCP instance with the provided IO and command
@@ -102,7 +103,7 @@ func (m *MCP) Start() error {
 	// Set stderr to the provided stderr
 	m.cmd.Stderr = m.stderr
 
-	fmt.Fprintf(m.stderr, "Starting command: %s %v\n", m.command, m.args)
+	m.writeToStderr(fmt.Sprintf("Starting command: %s %v\n", m.command, m.args))
 
 	// Start the command
 	if err := m.cmd.Start(); err != nil {
@@ -131,9 +132,9 @@ func (m *MCP) Start() error {
 		m.pendingMtx.Unlock()
 		
 		if err != nil {
-			fmt.Fprintf(m.stderr, "Command exited with error: %v\n", err)
+			m.writeToStderr(fmt.Sprintf("Command exited with error: %v\n", err))
 		} else {
-			fmt.Fprintf(m.stderr, "Command completed successfully\n")
+			m.writeToStderr("Command completed successfully\n")
 		}
 	}()
 
@@ -172,6 +173,20 @@ func (m *MCP) getNextID() int {
 }
 
 // handleResponses reads and processes responses from the MCP command
+// writeToStdout writes to stdout with mutex protection
+func (m *MCP) writeToStdout(s string) {
+	m.ioMutex.Lock()
+	defer m.ioMutex.Unlock()
+	fmt.Fprint(m.stdout, s)
+}
+
+// writeToStderr writes to stderr with mutex protection
+func (m *MCP) writeToStderr(s string) {
+	m.ioMutex.Lock()
+	defer m.ioMutex.Unlock()
+	fmt.Fprint(m.stderr, s)
+}
+
 func (m *MCP) handleResponses() {
 	scanner := bufio.NewScanner(m.cmdStdout)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024) // Increase scanner buffer size
@@ -182,12 +197,12 @@ func (m *MCP) handleResponses() {
 		// Parse the response
 		var response Response
 		if err := json.Unmarshal([]byte(line), &response); err != nil {
-			fmt.Fprintf(m.stderr, "Failed to parse JSON-RPC response: %v\n", err)
+			m.writeToStderr(fmt.Sprintf("Failed to parse JSON-RPC response: %v\n", err))
 			continue
 		}
 		
 		// Write the response to stdout for logging if needed
-		fmt.Fprintln(m.stdout, line)
+		m.writeToStdout(line + "\n")
 		
 		// Look for a pending request with this ID
 		if response.ID != nil {
@@ -204,7 +219,7 @@ func (m *MCP) handleResponses() {
 					// Request was cancelled or timed out
 				default:
 					// Response channel is full, this shouldn't happen
-					fmt.Fprintf(m.stderr, "Warning: response channel full for request ID %v\n", response.ID)
+					m.writeToStderr(fmt.Sprintf("Warning: response channel full for request ID %v\n", response.ID))
 				}
 				
 				// For requests that only need the first response, we can clean up
@@ -227,7 +242,7 @@ func (m *MCP) handleResponses() {
 	}
 	
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(m.stderr, "Error reading from MCP command: %v\n", err)
+		m.writeToStderr(fmt.Sprintf("Error reading from MCP command: %v\n", err))
 	}
 }
 
@@ -247,7 +262,8 @@ func (m *MCP) dispatchToHandler(response *Response) {
 		m.handlersMtx.RUnlock()
 		
 		if ok && handler != nil {
-			handler(response)
+			// Run the handler in a separate goroutine to avoid blocking
+			go handler(response)
 		}
 	}
 }

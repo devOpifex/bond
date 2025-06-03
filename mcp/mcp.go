@@ -270,11 +270,11 @@ func (m *MCP) dispatchToHandler(response *Response) {
 
 // Call sends a JSON-RPC request to the MCP command and returns the response
 func (m *MCP) Call(method string, params any) (*Response, error) {
-	return m.CallWithTimeout(method, params, m.defaultTimeout)
+	return m.callWithTimeout(method, params, m.defaultTimeout)
 }
 
-// CallWithTimeout sends a JSON-RPC request to the MCP command and waits for the response with a timeout
-func (m *MCP) CallWithTimeout(method string, params any, timeout time.Duration) (*Response, error) {
+// callWithTimeout sends a JSON-RPC request to the MCP command and waits for the response with a timeout
+func (m *MCP) callWithTimeout(method string, params any, timeout time.Duration) (*Response, error) {
 	m.runningMtx.Lock()
 	if !m.running {
 		m.runningMtx.Unlock()

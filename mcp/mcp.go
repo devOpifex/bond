@@ -35,12 +35,12 @@ type MCP struct {
 	idMutex        sync.Mutex
 	running        bool
 	runningMtx     sync.Mutex
-	pending        map[interface{}]*pendingRequest
+	pending        map[any]*pendingRequest
 	pendingMtx     sync.RWMutex
 	defaultTimeout time.Duration
 	handlers       map[string]ResponseHandler
 	handlersMtx    sync.RWMutex
-	ioMutex        sync.Mutex // Protects stdout/stderr access
+	ioMutex        sync.Mutex // Protects stdout/stderr access from data races
 }
 
 // NewMCP creates a new MCP instance with the provided IO and command
@@ -52,7 +52,7 @@ func NewMCP(stdin io.Reader, stdout, stderr io.Writer, command string, args []st
 		command:        command,
 		args:           args,
 		nextID:         1,
-		pending:        make(map[interface{}]*pendingRequest),
+		pending:        make(map[any]*pendingRequest),
 		defaultTimeout: 30 * time.Second, // Default timeout for requests
 		handlers:       make(map[string]ResponseHandler),
 	}
@@ -87,19 +87,19 @@ func (m *MCP) Start() error {
 
 	// Execute the command
 	m.cmd = exec.Command(m.command, m.args...)
-	
+
 	var err error
 	// Create pipes for stdin and stdout
 	m.cmdStdin, err = m.cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("failed to create stdin pipe: %w", err)
 	}
-	
+
 	m.cmdStdout, err = m.cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
-	
+
 	// Set stderr to the provided stderr
 	m.cmd.Stderr = m.stderr
 
@@ -119,7 +119,7 @@ func (m *MCP) Start() error {
 		m.runningMtx.Lock()
 		m.running = false
 		m.runningMtx.Unlock()
-		
+
 		// Clean up any pending requests
 		m.pendingMtx.Lock()
 		for id, req := range m.pending {
@@ -130,7 +130,7 @@ func (m *MCP) Start() error {
 			delete(m.pending, id)
 		}
 		m.pendingMtx.Unlock()
-		
+
 		if err != nil {
 			m.writeToStderr(fmt.Sprintf("Command exited with error: %v\n", err))
 		} else {
@@ -145,21 +145,21 @@ func (m *MCP) Start() error {
 func (m *MCP) Stop() error {
 	m.runningMtx.Lock()
 	defer m.runningMtx.Unlock()
-	
+
 	if !m.running {
 		return fmt.Errorf("MCP is not running")
 	}
-	
+
 	// Close stdin to signal the command to terminate
 	if m.cmdStdin != nil {
 		m.cmdStdin.Close()
 	}
-	
+
 	// Kill the process if it doesn't terminate gracefully
 	if m.cmd.Process != nil {
 		return m.cmd.Process.Kill()
 	}
-	
+
 	return nil
 }
 
@@ -190,26 +190,26 @@ func (m *MCP) writeToStderr(s string) {
 func (m *MCP) handleResponses() {
 	scanner := bufio.NewScanner(m.cmdStdout)
 	scanner.Buffer(make([]byte, 1024*1024), 10*1024*1024) // Increase scanner buffer size
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Parse the response
 		var response Response
 		if err := json.Unmarshal([]byte(line), &response); err != nil {
 			m.writeToStderr(fmt.Sprintf("Failed to parse JSON-RPC response: %v\n", err))
 			continue
 		}
-		
+
 		// Write the response to stdout for logging if needed
 		m.writeToStdout(line + "\n")
-		
+
 		// Look for a pending request with this ID
 		if response.ID != nil {
 			m.pendingMtx.RLock()
 			req, ok := m.pending[response.ID]
 			m.pendingMtx.RUnlock()
-			
+
 			if ok {
 				// Found a matching request, send the response
 				select {
@@ -221,13 +221,13 @@ func (m *MCP) handleResponses() {
 					// Response channel is full, this shouldn't happen
 					m.writeToStderr(fmt.Sprintf("Warning: response channel full for request ID %v\n", response.ID))
 				}
-				
+
 				// For requests that only need the first response, we can clean up
 				// More complex protocols might need to keep the request around for multiple responses
 				m.pendingMtx.Lock()
 				delete(m.pending, response.ID)
 				m.pendingMtx.Unlock()
-				
+
 				if req.timeout != nil {
 					req.timeout.Stop()
 				}
@@ -240,7 +240,7 @@ func (m *MCP) handleResponses() {
 			m.dispatchToHandler(&response)
 		}
 	}
-	
+
 	if err := scanner.Err(); err != nil {
 		m.writeToStderr(fmt.Sprintf("Error reading from MCP command: %v\n", err))
 	}
@@ -250,17 +250,17 @@ func (m *MCP) handleResponses() {
 func (m *MCP) dispatchToHandler(response *Response) {
 	// Extract method from result if available
 	method := ""
-	if result, ok := response.Result.(map[string]interface{}); ok {
+	if result, ok := response.Result.(map[string]any); ok {
 		if methodVal, ok := result["method"].(string); ok {
 			method = methodVal
 		}
 	}
-	
+
 	if method != "" {
 		m.handlersMtx.RLock()
 		handler, ok := m.handlers[method]
 		m.handlersMtx.RUnlock()
-		
+
 		if ok && handler != nil {
 			// Run the handler in a separate goroutine to avoid blocking
 			go handler(response)
@@ -269,33 +269,33 @@ func (m *MCP) dispatchToHandler(response *Response) {
 }
 
 // Call sends a JSON-RPC request to the MCP command and returns the response
-func (m *MCP) Call(method string, params interface{}) (*Response, error) {
+func (m *MCP) Call(method string, params any) (*Response, error) {
 	return m.CallWithTimeout(method, params, m.defaultTimeout)
 }
 
 // CallWithTimeout sends a JSON-RPC request to the MCP command and waits for the response with a timeout
-func (m *MCP) CallWithTimeout(method string, params interface{}, timeout time.Duration) (*Response, error) {
+func (m *MCP) CallWithTimeout(method string, params any, timeout time.Duration) (*Response, error) {
 	m.runningMtx.Lock()
 	if !m.running {
 		m.runningMtx.Unlock()
 		return nil, fmt.Errorf("MCP is not running")
 	}
 	m.runningMtx.Unlock()
-	
+
 	// Create a new request with the next available ID
 	id := m.getNextID()
 	request := NewRequest(method, params, id)
-	
+
 	// Set up channels to receive the response
 	responseChan := make(chan *Response, 1)
 	doneChan := make(chan struct{})
-	
+
 	// Create and register the pending request
 	req := &pendingRequest{
 		response: responseChan,
 		done:     doneChan,
 	}
-	
+
 	// Create a timer for the timeout
 	if timeout > 0 {
 		req.timeout = time.AfterFunc(timeout, func() {
@@ -305,12 +305,12 @@ func (m *MCP) CallWithTimeout(method string, params interface{}, timeout time.Du
 			close(doneChan)
 		})
 	}
-	
+
 	// Register the pending request
 	m.pendingMtx.Lock()
 	m.pending[id] = req
 	m.pendingMtx.Unlock()
-	
+
 	// Marshal the request to JSON
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
@@ -322,7 +322,7 @@ func (m *MCP) CallWithTimeout(method string, params interface{}, timeout time.Du
 		}
 		return nil, fmt.Errorf("failed to marshal JSON-RPC request: %w", err)
 	}
-	
+
 	// Send the request to the MCP command
 	if _, err := fmt.Fprintln(m.cmdStdin, string(requestJSON)); err != nil {
 		m.pendingMtx.Lock()
@@ -333,7 +333,7 @@ func (m *MCP) CallWithTimeout(method string, params interface{}, timeout time.Du
 		}
 		return nil, fmt.Errorf("failed to send JSON-RPC request: %w", err)
 	}
-	
+
 	// Wait for the response or timeout
 	select {
 	case response := <-responseChan:
@@ -344,28 +344,28 @@ func (m *MCP) CallWithTimeout(method string, params interface{}, timeout time.Du
 }
 
 // Notify sends a JSON-RPC notification (request without an ID) to the MCP command
-func (m *MCP) Notify(method string, params interface{}) error {
+func (m *MCP) Notify(method string, params any) error {
 	m.runningMtx.Lock()
 	if !m.running {
 		m.runningMtx.Unlock()
 		return fmt.Errorf("MCP is not running")
 	}
 	m.runningMtx.Unlock()
-	
+
 	// Create a new notification (request without ID)
 	request := NewRequest(method, params, nil)
-	
+
 	// Marshal the request to JSON
 	requestJSON, err := json.Marshal(request)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON-RPC notification: %w", err)
 	}
-	
+
 	// Send the notification to the MCP command
 	if _, err := fmt.Fprintln(m.cmdStdin, string(requestJSON)); err != nil {
 		return fmt.Errorf("failed to send JSON-RPC notification: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -380,24 +380,24 @@ func (m *MCP) BatchCall(calls []struct {
 		return fmt.Errorf("MCP is not running")
 	}
 	m.runningMtx.Unlock()
-	
+
 	// Create batch of requests
 	requests := make([]*Request, len(calls))
 	for i, call := range calls {
 		id := m.getNextID()
 		requests[i] = NewRequest(call.Method, call.Params, id)
 	}
-	
+
 	// Marshal the batch to JSON
 	batchJSON, err := json.Marshal(requests)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON-RPC batch request: %w", err)
 	}
-	
+
 	// Send the batch to the MCP command
 	if _, err := fmt.Fprintln(m.cmdStdin, string(batchJSON)); err != nil {
 		return fmt.Errorf("failed to send JSON-RPC batch request: %w", err)
 	}
-	
+
 	return nil
 }

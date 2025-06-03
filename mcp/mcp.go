@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -35,11 +34,6 @@ func New(command string, args []string) *MCP {
 
 // Start begins the MCP protocol handling loop and executes the command
 func (m *MCP) Start() error {
-	// Only start the MCP protocol if a command is provided
-	if m.command == "" {
-		return m.startProtocol()
-	}
-
 	// Execute the command
 	cmd := exec.Command(m.command, m.args...)
 	cmd.Stdin = m.stdin
@@ -47,59 +41,6 @@ func (m *MCP) Start() error {
 	cmd.Stderr = m.stderr
 
 	fmt.Fprintf(m.stderr, "Starting command: %s %v\n", m.command, m.args)
-	
+
 	return cmd.Run()
 }
-
-// startProtocol handles the MCP protocol communication
-func (m *MCP) startProtocol() error {
-	decoder := json.NewDecoder(m.stdin)
-	encoder := json.NewEncoder(m.stdout)
-
-	for {
-		var request MCPRequest
-		if err := decoder.Decode(&request); err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return fmt.Errorf("failed to decode request: %w", err)
-		}
-
-		// Process the request and prepare a response
-		response := m.processRequest(request)
-
-		if err := encoder.Encode(response); err != nil {
-			return fmt.Errorf("failed to encode response: %w", err)
-		}
-	}
-}
-
-// processRequest handles an incoming MCP request and returns a response
-func (m *MCP) processRequest(request MCPRequest) MCPResponse {
-	response := MCPResponse{
-		Status: "ok",
-		ID:     request.ID,
-	}
-
-	switch request.Command {
-	case "ping":
-		response.Data = map[string]any{
-			"message": "pong",
-		}
-	case "tool_use":
-		// Handle tool use request - this is a placeholder
-		// In a full implementation, this would execute the requested tool
-		response.ToolUse = &ToolUseResponse{
-			ToolName: request.ToolName,
-			Result: map[string]any{
-				"message": "Tool execution not yet implemented",
-			},
-		}
-	default:
-		response.Status = "error"
-		response.Error = fmt.Sprintf("unknown command: %s", request.Command)
-	}
-
-	return response
-}
-

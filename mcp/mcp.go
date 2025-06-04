@@ -9,6 +9,9 @@ import (
 	"os/exec"
 	"sync"
 	"time"
+	
+	"github.com/devOpifex/bond/models"
+	"github.com/devOpifex/bond/tools"
 )
 
 // ResponseHandler is a function that handles JSON-RPC responses
@@ -52,6 +55,7 @@ type MCP struct {
 	handlersMtx    sync.RWMutex
 	ioMutex        sync.Mutex // Protects stdout/stderr access from data races
 	capabilities   *MCPCapabilities
+	toolRegistry   *tools.Registry
 }
 
 // NewMCP creates a new MCP instance with the provided IO and command
@@ -67,12 +71,39 @@ func NewMCP(stdin io.Reader, stdout, stderr io.Writer, command string, args []st
 		defaultTimeout: 30 * time.Second, // Default timeout for requests
 		handlers:       make(map[string]ResponseHandler),
 		capabilities:   &MCPCapabilities{},
+		toolRegistry:   tools.NewRegistry(),
 	}
 }
 
 // New creates a new MCP instance with standard IO
 func New(command string, args []string) *MCP {
 	return NewMCP(os.Stdin, os.Stdout, os.Stderr, command, args)
+}
+
+// WithToolRegistry sets a custom tool registry for the MCP
+func (m *MCP) WithToolRegistry(registry *tools.Registry) *MCP {
+	m.toolRegistry = registry
+	return m
+}
+
+// RegisterTool adds a tool to the MCP registry
+func (m *MCP) RegisterTool(tool models.ToolExecutor) error {
+	return m.toolRegistry.Register(tool)
+}
+
+// convertToMCPTool converts a Bond tool to an MCP tool definition
+func convertToMCPTool(tool models.ToolExecutor) Tool {
+	schema, err := json.Marshal(tool.GetSchema())
+	if err != nil {
+		// If there's an error marshaling the schema, provide a minimal valid schema
+		schema = []byte(`{"type": "object", "properties": {}}`)
+	}
+	
+	return Tool{
+		Name:        tool.GetName(),
+		Description: tool.GetDescription(),
+		InputSchema: schema,
+	}
 }
 
 // SetDefaultTimeout sets the default timeout for requests
@@ -331,66 +362,171 @@ func (m *MCP) Call(method string, params any) (*Response, error) {
 
 // ListTools queries the MCP server for available tools
 func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
-	params := map[string]string{}
-	if cursor != "" {
-		params["cursor"] = cursor
-	}
+	m.runningMtx.Lock()
+	running := m.running
+	m.runningMtx.Unlock()
+	
+	// If MCP is running, query the server
+	if running {
+		params := map[string]string{}
+		if cursor != "" {
+			params["cursor"] = cursor
+		}
 
-	response, err := m.Call("tools/list", params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list tools: %w", err)
-	}
+		response, err := m.Call("tools/list", params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list tools: %w", err)
+		}
 
-	if response.Error != nil {
-		return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
-	}
+		if response.Error != nil {
+			return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
+		}
 
-	// Convert the result to a ToolListResult
-	resultBytes, err := json.Marshal(response.Result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal tool list result: %w", err)
-	}
+		// Convert the result to a ToolListResult
+		resultBytes, err := json.Marshal(response.Result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal tool list result: %w", err)
+		}
 
-	var toolList ToolListResult
-	if err := json.Unmarshal(resultBytes, &toolList); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal tool list result: %w", err)
-	}
+		var toolList ToolListResult
+		if err := json.Unmarshal(resultBytes, &toolList); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal tool list result: %w", err)
+		}
 
-	return &toolList, nil
+		return &toolList, nil
+	}
+	
+	// If MCP is not running, return the local tool registry
+	tools := m.toolRegistry.GetAll()
+	mcpTools := make([]Tool, 0, len(tools))
+	
+	for _, tool := range tools {
+		mcpTools = append(mcpTools, convertToMCPTool(tool))
+	}
+	
+	return &ToolListResult{
+		Tools: mcpTools,
+	}, nil
 }
 
 // CallTool invokes a tool on the MCP server with the given name and arguments
 func (m *MCP) CallTool(name string, arguments map[string]any) (*ToolCallResult, error) {
-	params := ToolCallParams{
-		Name:      name,
-		Arguments: arguments,
-	}
+	m.runningMtx.Lock()
+	running := m.running
+	m.runningMtx.Unlock()
+	
+	// If MCP is running, call the tool on the server
+	if running {
+		params := ToolCallParams{
+			Name:      name,
+			Arguments: arguments,
+		}
 
-	response, err := m.Call("tools/call", params)
+		response, err := m.Call("tools/call", params)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call tool: %w", err)
+		}
+
+		if response.Error != nil {
+			return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
+		}
+
+		// Convert the result to a ToolCallResult
+		resultBytes, err := json.Marshal(response.Result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal tool call result: %w", err)
+		}
+
+		var toolResult ToolCallResult
+		if err := json.Unmarshal(resultBytes, &toolResult); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal tool call result: %w", err)
+		}
+
+		return &toolResult, nil
+	}
+	
+	// If MCP is not running, execute the tool locally
+	tool, exists := m.toolRegistry.Get(name)
+	if !exists {
+		return nil, fmt.Errorf("tool '%s' not found in registry", name)
+	}
+	
+	// Convert arguments to JSON
+	argsBytes, err := json.Marshal(arguments)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call tool: %w", err)
+		return nil, fmt.Errorf("failed to marshal tool arguments: %w", err)
 	}
-
-	if response.Error != nil {
-		return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
-	}
-
-	// Convert the result to a ToolCallResult
-	resultBytes, err := json.Marshal(response.Result)
+	
+	// Execute the tool
+	result, err := tool.Execute(argsBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal tool call result: %w", err)
+		return &ToolCallResult{
+			Content: []ToolContent{
+				{
+					Type: "text",
+					Text: fmt.Sprintf("Error executing tool: %v", err),
+				},
+			},
+			IsError: true,
+		}, nil
 	}
+	
+	// Return the result
+	return &ToolCallResult{
+		Content: []ToolContent{
+			{
+				Type: "text",
+				Text: result,
+			},
+		},
+		IsError: false,
+	}, nil
+}
 
-	var toolResult ToolCallResult
-	if err := json.Unmarshal(resultBytes, &toolResult); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal tool call result: %w", err)
+// InitCapabilities starts the MCP if it's not running and gets the capabilities
+func (m *MCP) InitCapabilities() (*MCPCapabilities, error) {
+	m.runningMtx.Lock()
+	running := m.running
+	m.runningMtx.Unlock()
+	
+	// Start the MCP if it's not running
+	if !running {
+		if err := m.Start(); err != nil {
+			return nil, fmt.Errorf("failed to start MCP: %w", err)
+		}
 	}
-
-	return &toolResult, nil
+	
+	// Get the capabilities
+	capabilities, err := m.GetCapabilities()
+	if err != nil {
+		return nil, err
+	}
+	
+	// Get the tool list to initialize tools
+	_, err = m.ListTools("")
+	if err != nil {
+		m.writeToStderr(fmt.Sprintf("Warning: failed to list tools: %v\n", err))
+		// Continue anyway - tool listing might fail but we still have capabilities
+	}
+	
+	return capabilities, nil
 }
 
 // GetCapabilities fetches and stores the server's capabilities
 func (m *MCP) GetCapabilities() (*MCPCapabilities, error) {
+	m.runningMtx.Lock()
+	running := m.running
+	m.runningMtx.Unlock()
+	
+	if !running {
+		// If not running, return default capabilities
+		return &MCPCapabilities{
+			Tools: ToolsCapability{
+				ListChanged: true,
+			},
+		}, nil
+	}
+	
 	response, err := m.Call("initialize", map[string]any{
 		"protocolVersion": "2024-11-05",
 		"capabilities":    map[string]any{},

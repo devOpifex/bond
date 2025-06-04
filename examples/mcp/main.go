@@ -66,28 +66,24 @@ func main() {
 		schemaJSON, _ := json.MarshalIndent(schemaObj, "", "  ")
 		fmt.Println(string(schemaJSON))
 
-		fmt.Println("\nNote: This example doesn't provide actual arguments to the tool.")
-		fmt.Println("In a real application, you would extract required parameters from the schema")
-		fmt.Println("and provide appropriate values.")
-
 		// This is a very simple example that would need to be adapted to the actual tool
 		// For demo purposes, we're just creating an empty arguments map
 		// In a real application, you'd extract the required parameters from the schema
 		// and provide appropriate values
-		// arguments := map[string]any{}
+		arguments := map[string]any{
+			"url": "https://www.opifex.org",
+		}
 
 		// Comment out the actual tool call since we don't have real arguments
 		// Uncomment and adapt this code when you have a real MCP server and know the required arguments
-		/*
-			result, err := mcpInstance.CallTool(exampleTool.Name, arguments)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error calling tool: %v\n", err)
-			} else {
-				fmt.Println("Tool result:")
-				resultJSON, _ := json.MarshalIndent(result, "", "  ")
-				fmt.Println(string(resultJSON))
-			}
-		*/
+		result, err := mcpInstance.CallTool(exampleTool.Name, arguments)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error calling tool: %v\n", err)
+		} else {
+			fmt.Println("Tool result:")
+			resultJSON, _ := json.MarshalIndent(result, "", "  ")
+			fmt.Println(string(resultJSON))
+		}
 	}
 
 	fmt.Println("\nStopping MCP client...")

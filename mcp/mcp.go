@@ -159,8 +159,6 @@ func (m *MCP) Start() error {
 
 		if err != nil {
 			m.writeToStderr(fmt.Sprintf("Command exited with error: %v\n", err))
-		} else {
-			m.writeToStderr("Command completed successfully\n")
 		}
 	}()
 
@@ -226,9 +224,10 @@ func (m *MCP) handleResponses() {
 			m.writeToStderr(fmt.Sprintf("Failed to parse JSON-RPC response: %v\n", err))
 			continue
 		}
-
-		// Write the response to stdout for logging if needed
-		m.writeToStdout(line + "\n")
+		
+		// We don't log responses to stdout by default to avoid cluttering the output
+		// Uncomment the next line for debugging purposes only
+		// m.writeToStdout(line + "\n")
 
 		// Look for a pending request with this ID
 		if response.ID != nil {
@@ -236,9 +235,8 @@ func (m *MCP) handleResponses() {
 			var lookupID any = response.ID
 			if floatID, ok := response.ID.(float64); ok {
 				lookupID = int(floatID)
-				m.writeToStderr(fmt.Sprintf("Converting float64 ID %v to int %v\n", floatID, lookupID))
 			}
-			
+
 			m.pendingMtx.RLock()
 			req, ok := m.pending[lookupID]
 			if !ok && lookupID != response.ID {

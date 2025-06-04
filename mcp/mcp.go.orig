@@ -232,19 +232,8 @@ func (m *MCP) handleResponses() {
 
 		// Look for a pending request with this ID
 		if response.ID != nil {
-			// JSON numbers are unmarshaled as float64, but our ID might be int
-			var lookupID any = response.ID
-			if floatID, ok := response.ID.(float64); ok {
-				lookupID = int(floatID)
-				m.writeToStderr(fmt.Sprintf("Converting float64 ID %v to int %v\n", floatID, lookupID))
-			}
-			
 			m.pendingMtx.RLock()
-			req, ok := m.pending[lookupID]
-			if !ok && lookupID != response.ID {
-				// Try with original ID if conversion didn't match
-				req, ok = m.pending[response.ID]
-			}
+			req, ok := m.pending[response.ID]
 			m.pendingMtx.RUnlock()
 
 			if ok {
@@ -262,12 +251,7 @@ func (m *MCP) handleResponses() {
 				// For requests that only need the first response, we can clean up
 				// More complex protocols might need to keep the request around for multiple responses
 				m.pendingMtx.Lock()
-				// Delete using the same ID type that we found in the map
-				if floatID, ok := response.ID.(float64); ok {
-					delete(m.pending, int(floatID))
-				} else {
-					delete(m.pending, response.ID)
-				}
+				delete(m.pending, response.ID)
 				m.pendingMtx.Unlock()
 
 				if req.timeout != nil {

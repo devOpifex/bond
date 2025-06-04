@@ -11,7 +11,8 @@ import (
 
 func main() {
 	// Create a new MCP instance with mcpOrchestra command
-	mcpInstance := mcp.New("mcpOrchestra", []string{})
+	// Replace "mcpOrchestra" with your actual MCP-compatible server command
+	mcpInstance := mcp.New("mcpbrowser", nil)
 
 	// Set a timeout for requests
 	mcpInstance.SetDefaultTimeout(5 * time.Second)
@@ -24,34 +25,72 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("MCP client started. Sending tools/list request...")
-
-	// Send a JSON-RPC request for tools/list method
-	response, err := mcpInstance.Call("tools/list", nil)
-
+	// Get server capabilities
+	capabilities, err := mcpInstance.GetCapabilities()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error calling tools/list method: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: couldn't get server capabilities: %v\n", err)
+	} else {
+		fmt.Println("Server capabilities:")
+		capabilitiesJSON, _ := json.MarshalIndent(capabilities, "", "  ")
+		fmt.Println(string(capabilitiesJSON))
+	}
+
+	fmt.Println("\nFetching available tools...")
+
+	// List available tools
+	toolList, err := mcpInstance.ListTools("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error listing tools: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Print the response in a formatted way
-	fmt.Println("Received response from tools/list:")
-	if response.Error != nil {
-		fmt.Printf("Error: %s (code: %d)\n", response.Error.Message, response.Error.Code)
-		if response.Error.Data != nil {
-			fmt.Printf("Error data: %v\n", response.Error.Data)
-		}
-	} else {
-		// Pretty print the result
-		resultJSON, err := json.MarshalIndent(response.Result, "", "  ")
-		if err != nil {
-			fmt.Printf("Result: %v\n", response.Result)
-		} else {
-			fmt.Printf("%s\n", resultJSON)
-		}
+	// Print the tool list
+	fmt.Printf("Found %d tools:\n", len(toolList.Tools))
+	for i, tool := range toolList.Tools {
+		fmt.Printf("%d. %s - %s\n", i+1, tool.Name, tool.Description)
 	}
 
-	fmt.Println("Stopping MCP client...")
+	// If we have at least one tool, try to call it
+	if len(toolList.Tools) > 0 {
+		exampleTool := toolList.Tools[0]
+		fmt.Printf("\nCalling tool: %s\n", exampleTool.Name)
+
+		// Parse the input schema to understand required arguments
+		var schemaObj map[string]interface{}
+		if err := json.Unmarshal(exampleTool.InputSchema, &schemaObj); err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing input schema: %v\n", err)
+		}
+
+		// For demo purposes, we'll print the schema
+		fmt.Println("Tool input schema:")
+		schemaJSON, _ := json.MarshalIndent(schemaObj, "", "  ")
+		fmt.Println(string(schemaJSON))
+
+		fmt.Println("\nNote: This example doesn't provide actual arguments to the tool.")
+		fmt.Println("In a real application, you would extract required parameters from the schema")
+		fmt.Println("and provide appropriate values.")
+
+		// This is a very simple example that would need to be adapted to the actual tool
+		// For demo purposes, we're just creating an empty arguments map
+		// In a real application, you'd extract the required parameters from the schema
+		// and provide appropriate values
+		// arguments := map[string]any{}
+
+		// Comment out the actual tool call since we don't have real arguments
+		// Uncomment and adapt this code when you have a real MCP server and know the required arguments
+		/*
+			result, err := mcpInstance.CallTool(exampleTool.Name, arguments)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error calling tool: %v\n", err)
+			} else {
+				fmt.Println("Tool result:")
+				resultJSON, _ := json.MarshalIndent(result, "", "  ")
+				fmt.Println(string(resultJSON))
+			}
+		*/
+	}
+
+	fmt.Println("\nStopping MCP client...")
 
 	// Stop the MCP process
 	if err := mcpInstance.Stop(); err != nil {

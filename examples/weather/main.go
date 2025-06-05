@@ -34,7 +34,7 @@ func main() {
 			},
 			Required: []string{"location"},
 		},
-		func(params map[string]interface{}) (string, error) {
+		func(params map[string]any) (string, error) {
 			fmt.Println("Weather tool called with params:", params)
 			location, _ := params["location"].(string)
 			// In a real implementation, you would call a weather API here
@@ -48,7 +48,6 @@ func main() {
 	provider.RegisterTool(weatherTool)
 
 	// Send a message that will use the tool
-	fmt.Println("Sending message to Claude...")
 	ctx := context.Background()
 	response, err := provider.SendMessageWithTools(
 		ctx,
@@ -64,3 +63,4 @@ func main() {
 
 	fmt.Printf("Claude's response: %s\n", response)
 }
+

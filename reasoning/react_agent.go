@@ -20,16 +20,16 @@ import (
 type ReActAgent struct {
 	// provider is the LLM provider that handles communication with the AI model
 	provider models.Provider
-	
+
 	// tools is a registry of available tools that the agent can use
 	tools map[string]models.ToolExecutor
-	
+
 	// maxIterations limits the number of reasoning-action cycles to prevent infinite loops
 	maxIterations int
-	
+
 	// systemPrompt contains instructions that guide the AI model's behavior
 	systemPrompt string
-	
+
 	// messages stores the conversation history for context
 	messages []models.Message
 }
@@ -92,15 +92,15 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 	ra.provider.SetSystemPrompt(ra.systemPrompt)
 
 	var finalResponse string
-	
+
 	// Main ReAct loop
 	for i := 0; i < ra.maxIterations; i++ {
 		// Get the last message to send to the provider
 		lastMessage := ra.messages[len(ra.messages)-1]
-		
+
 		// Create a context that includes the full message history
 		ctxWithHistory := context.WithValue(ctx, "message_history", ra.messages)
-		
+
 		// Get next thought from the model
 		response, err := ra.provider.SendMessageWithTools(ctxWithHistory, lastMessage)
 		if err != nil {
@@ -116,7 +116,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 
 		// Parse response to extract tool calls
 		toolUse, actionText, isFinalResponse := parseResponse(response)
-		
+
 		// If this is a final response with no tool use, we're done
 		if isFinalResponse {
 			finalResponse = actionText
@@ -125,8 +125,6 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 
 		// If there's a tool to use, execute it
 		if toolUse != nil {
-			fmt.Printf("Tool use detected: %s with input: %v\n", toolUse.Name, toolUse.Input)
-			
 			// Find the tool
 			tool, exists := ra.tools[toolUse.Name]
 			if !exists {
@@ -151,7 +149,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				})
 				continue
 			}
-			
+
 			if err := json.Unmarshal(inputBytes, &inputJSON); err != nil {
 				toolResult := fmt.Sprintf("Error: Invalid tool input JSON: %v", err)
 				ra.messages = append(ra.messages, models.Message{
@@ -161,7 +159,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				})
 				continue
 			}
-			
+
 			// Execute the tool
 			result, err := tool.Execute(inputJSON)
 			if err != nil {
@@ -173,10 +171,10 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				})
 				continue
 			}
-			
+
 			// Store the assistant message for context
 			_ = context.WithValue(ctx, "original_message", assistantMessage)
-			
+
 			// Add the tool result to the message history
 			functionMessage := models.Message{
 				Role:       models.RoleFunction,
@@ -212,30 +210,29 @@ func parseResponse(response string) (*models.ToolUse, string, bool) {
 		// Extract the JSON between the markers
 		startMarker := "```json"
 		endMarker := "```"
-		
+
 		startIdx := strings.Index(response, startMarker) + len(startMarker)
 		endIdx := strings.Index(response[startIdx:], endMarker)
 		if endIdx == -1 {
 			return nil, response, false
 		}
-		
+
 		toolJSON := strings.TrimSpace(response[startIdx : startIdx+endIdx])
-		fmt.Printf("Found tool JSON: %s\n", toolJSON)
-		
+
 		// Parse the tool use JSON manually to handle different input formats
 		var rawToolUse map[string]interface{}
 		if err := json.Unmarshal([]byte(toolJSON), &rawToolUse); err != nil {
 			fmt.Printf("Error parsing tool JSON: %v\n", err)
 			return nil, response, false
 		}
-		
+
 		// Extract name and input
 		name, ok := rawToolUse["name"].(string)
 		if !ok {
 			fmt.Printf("No 'name' field found in tool JSON\n")
 			return nil, response, false
 		}
-		
+
 		// Handle input which can be a string or an object
 		var inputStr interface{}
 		if inputObj, ok := rawToolUse["input"].(map[string]interface{}); ok {
@@ -253,17 +250,17 @@ func parseResponse(response string) (*models.ToolUse, string, bool) {
 			// Use whatever input is
 			inputStr = rawToolUse["input"]
 		}
-		
+
 		toolUse := models.ToolUse{
-			Name: name,
+			Name:  name,
 			Input: inputStr,
 		}
-		
+
 		// Extract the thought text before the tool use
 		thoughtText := strings.TrimSpace(response[:strings.Index(response, "```json")])
 		return &toolUse, thoughtText, false
 	}
-	
+
 	// If no tool use is detected, this is a final response
 	return nil, response, true
 }
@@ -300,3 +297,4 @@ I need to search for information about Python.
 ` + "```" + `
 
 Always think carefully before deciding which tool to use.`
+

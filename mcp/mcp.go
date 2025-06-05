@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"sync"
 	"time"
-	
+
 	"github.com/devOpifex/bond/models"
 	"github.com/devOpifex/bond/tools"
 )
@@ -140,8 +140,6 @@ func (m *MCP) Start() error {
 	// Set stderr to the provided stderr
 	m.cmd.Stderr = m.stderr
 
-	m.writeToStderr(fmt.Sprintf("Starting command: %s %v\n", m.command, m.args))
-
 	// Start the command
 	if err := m.cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
@@ -152,7 +150,6 @@ func (m *MCP) Start() error {
 
 	// Set up a default handler for tools list changed notifications
 	m.RegisterHandler("notifications/tools/list_changed", func(response *Response) {
-		m.writeToStderr("Received tools/list_changed notification, tool list has changed\n")
 		// Typically you would refresh the tool list here
 		// This is a default handler - users can override it with their own handler
 	})
@@ -249,7 +246,7 @@ func (m *MCP) handleResponses() {
 			m.writeToStderr(fmt.Sprintf("Failed to parse JSON-RPC response: %v\n", err))
 			continue
 		}
-		
+
 		// We don't log responses to stdout by default to avoid cluttering the output
 		// Uncomment the next line for debugging purposes only
 		// m.writeToStdout(line + "\n")
@@ -359,7 +356,7 @@ func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
-	
+
 	// If MCP is running, query the server
 	if running {
 		params := map[string]string{}
@@ -389,15 +386,15 @@ func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
 
 		return &toolList, nil
 	}
-	
+
 	// If MCP is not running, return the local tool registry
 	tools := m.toolRegistry.GetAll()
 	mcpTools := make([]models.Tool, 0, len(tools))
-	
+
 	for _, tool := range tools {
 		mcpTools = append(mcpTools, convertToMCPTool(tool))
 	}
-	
+
 	return &ToolListResult{
 		Tools: mcpTools,
 	}, nil
@@ -408,7 +405,7 @@ func (m *MCP) CallTool(name string, arguments map[string]any) (*models.ToolResul
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
-	
+
 	// If MCP is running, call the tool on the server
 	if running {
 		params := ToolCallParams{
@@ -489,19 +486,19 @@ func (m *MCP) CallTool(name string, arguments map[string]any) (*models.ToolResul
 
 		return &toolResult, nil
 	}
-	
+
 	// If MCP is not running, execute the tool locally
 	tool, exists := m.toolRegistry.Get(name)
 	if !exists {
 		return nil, fmt.Errorf("tool '%s' not found in registry", name)
 	}
-	
+
 	// Convert arguments to JSON
 	argsBytes, err := json.Marshal(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal tool arguments: %w", err)
 	}
-	
+
 	// Execute the tool
 	result, err := tool.Execute(argsBytes)
 	if err != nil {
@@ -517,7 +514,7 @@ func (m *MCP) CallTool(name string, arguments map[string]any) (*models.ToolResul
 			},
 		}, nil
 	}
-	
+
 	// Return the result
 	return &models.ToolResult{
 		Name:    name,
@@ -537,27 +534,27 @@ func (m *MCP) InitCapabilities() (*MCPCapabilities, error) {
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
-	
+
 	// Start the MCP if it's not running
 	if !running {
 		if err := m.Start(); err != nil {
 			return nil, fmt.Errorf("failed to start MCP: %w", err)
 		}
 	}
-	
+
 	// Get the capabilities
 	capabilities, err := m.GetCapabilities()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Get the tool list to initialize tools
 	_, err = m.ListTools("")
 	if err != nil {
 		m.writeToStderr(fmt.Sprintf("Warning: failed to list tools: %v\n", err))
 		// Continue anyway - tool listing might fail but we still have capabilities
 	}
-	
+
 	return capabilities, nil
 }
 
@@ -566,7 +563,7 @@ func (m *MCP) GetCapabilities() (*MCPCapabilities, error) {
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
-	
+
 	if !running {
 		// If not running, return default capabilities
 		return &MCPCapabilities{
@@ -575,7 +572,7 @@ func (m *MCP) GetCapabilities() (*MCPCapabilities, error) {
 			},
 		}, nil
 	}
-	
+
 	response, err := m.Call("initialize", map[string]any{
 		"protocolVersion": "2024-11-05",
 		"capabilities":    map[string]any{},

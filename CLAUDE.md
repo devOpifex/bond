@@ -17,5 +17,6 @@ Keep function and method names short.
 - **Documentation**: Package-level docs, godoc format for functions
 - **Project Structure**: Organized by functionality (providers, tools, reasoning)
 - **Testing**: Table-driven tests in *_test.go files, mocks for dependencies
+- Use `any` instead of `interface{}` where possible
 
 Use `make` commands whenever possible for consistency.

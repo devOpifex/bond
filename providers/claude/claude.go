@@ -22,25 +22,25 @@ import (
 type Provider struct {
 	// APIKey is the authentication token for Claude's API
 	APIKey string
-	
+
 	// BaseURL is the endpoint for Claude's API
 	BaseURL string
-	
+
 	// Model specifies which Claude model to use
 	Model string
-	
+
 	// HTTPClient is used for making requests to Claude's API
 	HTTPClient *http.Client
-	
+
 	// System prompt provides context and instructions for the model
 	SystemPrompt string
-	
+
 	// MaxTokens limits the length of the model's response
 	MaxTokens int
-	
+
 	// Temperature controls randomness in the model's output (0.0-1.0)
 	Temperature float64
-	
+
 	// Tools that have been registered for use with this provider
 	Tools []models.ToolExecutor
 }
@@ -102,7 +102,7 @@ func (p *Provider) RegisterTool(tool models.ToolExecutor) {
 			return
 		}
 	}
-	
+
 	// Tool not registered yet, add it
 	p.Tools = append(p.Tools, tool)
 }
@@ -117,10 +117,6 @@ func (p *Provider) SendMessage(ctx context.Context, message models.Message) (str
 // This method includes information about registered tools in the request,
 // allowing Claude to call these tools during its reasoning process.
 func (p *Provider) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
-	fmt.Printf("SendMessageWithTools called with %d registered tools\n", len(p.Tools))
-	for i, tool := range p.Tools {
-		fmt.Printf("Tool %d: %s - %s\n", i, tool.GetName(), tool.GetDescription())
-	}
 	return p.sendRequest(ctx, message, true)
 }
 
@@ -163,11 +159,11 @@ func (p *Provider) prepareChatContext(ctx context.Context, message models.Messag
 // It builds a list of tool definitions that Claude can understand and use.
 func (p *Provider) prepareToolsForRequest() []map[string]interface{} {
 	toolDefinitions := make([]map[string]interface{}, 0, len(p.Tools))
-	
+
 	for _, tool := range p.Tools {
 		// Convert each tool to Claude's expected format
 		schema := tool.GetSchema()
-		
+
 		// Convert the schema to a JSON Schema compatible format
 		toolDef := map[string]interface{}{
 			"name":        tool.GetName(),
@@ -177,15 +173,15 @@ func (p *Provider) prepareToolsForRequest() []map[string]interface{} {
 				"properties": schema.Properties,
 			},
 		}
-		
+
 		// Add required fields if any
 		if len(schema.Required) > 0 {
 			toolDef["input_schema"].(map[string]interface{})["required"] = schema.Required
 		}
-		
+
 		toolDefinitions = append(toolDefinitions, toolDef)
 	}
-	
+
 	return toolDefinitions
 }
 
@@ -194,7 +190,7 @@ func (p *Provider) prepareToolsForRequest() []map[string]interface{} {
 func (p *Provider) sendRequest(ctx context.Context, message models.Message, withTools bool) (string, error) {
 	// Build the Claude-formatted messages
 	messages := p.prepareChatContext(ctx, message)
-	
+
 	// Create the request payload
 	payload := map[string]interface{}{
 		"model":       p.Model,
@@ -202,49 +198,48 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 		"max_tokens":  p.MaxTokens,
 		"temperature": p.Temperature,
 	}
-	
+
 	// Add system prompt if provided
 	if p.SystemPrompt != "" {
 		payload["system"] = p.SystemPrompt
 	}
-	
+
 	// Add tools if requested and available
 	if withTools && len(p.Tools) > 0 {
 		toolDefinitions := p.prepareToolsForRequest()
-		fmt.Printf("Sending %d tool definitions to Claude\n", len(toolDefinitions))
 		payload["tools"] = toolDefinitions
 	}
-	
+
 	// Convert the payload to JSON
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal Claude request: %w", err)
 	}
-	
+
 	// Create the HTTP request
 	req, err := http.NewRequestWithContext(ctx, "POST", p.BaseURL, strings.NewReader(string(payloadBytes)))
 	if err != nil {
 		return "", fmt.Errorf("failed to create Claude request: %w", err)
 	}
-	
+
 	// Set the required headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-api-key", p.APIKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
-	
+
 	// Send the request
 	resp, err := p.HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("Claude API request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read Claude API response: %w", err)
 	}
-	
+
 	// Check for API error
 	if resp.StatusCode != http.StatusOK {
 		// Try to parse the error message
@@ -254,10 +249,8 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 		}
 		return "", fmt.Errorf("Claude API error (%d): %s", resp.StatusCode, string(body))
 	}
-	
+
 	// Parse the successful response
-	fmt.Printf("Got successful response from Claude: %s\n", string(body))
-	
 	var claudeResp struct {
 		Content []struct {
 			Type  string          `json:"type"`
@@ -267,51 +260,48 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 		} `json:"content"`
 		StopReason string `json:"stop_reason"`
 	}
-	
+
 	if err := json.Unmarshal(body, &claudeResp); err != nil {
 		return "", fmt.Errorf("failed to parse Claude API response: %w", err)
 	}
-	
+
 	// Check if Claude wants to use a tool
 	if claudeResp.StopReason == "tool_use" {
 		// Find the tool use request
 		for _, content := range claudeResp.Content {
 			if content.Type == "tool_use" {
-				fmt.Printf("Tool use request: %s with input %s\n", content.Name, string(content.Input))
-				
 				// Find the tool
 				tool, exists := p.findTool(content.Name)
 				if !exists {
 					return fmt.Sprintf("Error: Tool '%s' not found", content.Name), nil
 				}
-				
+
 				// Execute the tool
 				result, err := tool.Execute(content.Input)
 				if err != nil {
 					return fmt.Sprintf("Error executing tool '%s': %v", content.Name, err), nil
 				}
-				
+
 				// Now we need to send the tool result back to Claude in a new request
 				toolResultMessage := models.Message{
 					Role:    models.RoleUser,
 					Content: fmt.Sprintf("Tool '%s' returned: %s", content.Name, result),
 				}
-				
+
 				// Recursive call to send the tool result back to Claude
 				return p.sendRequest(ctx, toolResultMessage, true)
 			}
 		}
 	}
-	
+
 	// Extract the text from the response
 	var responseText string
 	for _, content := range claudeResp.Content {
-		fmt.Printf("Response content type: %s\n", content.Type)
 		if content.Type == "text" {
 			responseText += content.Text
 		}
 	}
-	
+
 	return responseText, nil
 }
 
@@ -331,7 +321,7 @@ func (p *Provider) findTool(name string) (models.ToolExecutor, bool) {
 func convertMessagesToClaudeFormat(messages []models.Message) []models.Message {
 	// Claude only supports user and assistant roles
 	claudeMessages := []models.Message{}
-	
+
 	for _, msg := range messages {
 		switch msg.Role {
 		case models.RoleUser:
@@ -361,6 +351,7 @@ func convertMessagesToClaudeFormat(messages []models.Message) []models.Message {
 			claudeMessages = append(claudeMessages, userMsg)
 		}
 	}
-	
+
 	return claudeMessages
 }
+

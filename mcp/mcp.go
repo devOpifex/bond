@@ -91,6 +91,11 @@ func (m *MCP) RegisterTool(tool models.ToolExecutor) error {
 	return m.toolRegistry.Register(tool)
 }
 
+// GetRegistry returns the MCP tool registry
+func (m *MCP) GetRegistry(tool models.ToolExecutor) []models.Tool {
+	return m.toolRegistry.GetAll()
+}
+
 // convertToMCPTool converts a Bond tool to an MCP-compatible tool definition
 func convertToMCPTool(tool models.ToolExecutor) models.Tool {
 	return models.Tool{
@@ -352,7 +357,7 @@ func (m *MCP) Call(method string, params any) (*Response, error) {
 }
 
 // ListTools queries the MCP server for available tools
-func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
+func (m *MCP) ListTools() (*ToolListResult, error) {
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
@@ -360,9 +365,6 @@ func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
 	// If MCP is running, query the server
 	if running {
 		params := map[string]string{}
-		if cursor != "" {
-			params["cursor"] = cursor
-		}
 
 		response, err := m.Call("tools/list", params)
 		if err != nil {
@@ -529,8 +531,8 @@ func (m *MCP) CallTool(name string, arguments map[string]any) (*models.ToolResul
 	}, nil
 }
 
-// InitCapabilities starts the MCP if it's not running and gets the capabilities
-func (m *MCP) InitCapabilities() (*MCPCapabilities, error) {
+// Initialise starts the MCP if it's not running and gets the capabilities
+func (m *MCP) Initialise() (*MCPCapabilities, error) {
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
@@ -549,7 +551,7 @@ func (m *MCP) InitCapabilities() (*MCPCapabilities, error) {
 	}
 
 	// Get the tool list to initialize tools
-	_, err = m.ListTools("")
+	_, err = m.ListTools()
 	if err != nil {
 		m.writeToStderr(fmt.Sprintf("Warning: failed to list tools: %v\n", err))
 		// Continue anyway - tool listing might fail but we still have capabilities

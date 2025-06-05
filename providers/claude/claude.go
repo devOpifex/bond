@@ -363,7 +363,7 @@ func (p *Provider) registerMCP(command string, args []string) error {
 	client := mcp.New(command, args)
 	p.MCPs[command] = client
 
-	err := client.Start()
+	_, err := client.Initialise()
 	if err != nil {
 		return err
 	}

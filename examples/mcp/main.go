@@ -19,7 +19,7 @@ func main() {
 	fmt.Println("Initializing MCP client with capabilities...")
 
 	// Initialize capabilities (starts MCP if not running)
-	capabilities, err := mcpInstance.InitCapabilities()
+	capabilities, err := mcpInstance.Initialise()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error initializing capabilities: %v\n", err)
 		os.Exit(1)
@@ -32,7 +32,7 @@ func main() {
 	fmt.Println("\nFetching available tools...")
 
 	// List available tools
-	toolList, err := mcpInstance.ListTools("")
+	toolList, err := mcpInstance.ListTools()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error listing tools: %v\n", err)
 		os.Exit(1)

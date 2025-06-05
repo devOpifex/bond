@@ -24,23 +24,8 @@ func main() {
 	// Create a Claude provider
 	provider := claude.NewClient(apiKey)
 
-	// Set system prompt and model if needed
-	provider.SetSystemPrompt(`You are a helpful AI assistant that can use tools. 
-When asked a question that requires calculation, use the calculator tool.
-You MUST format your tool calls exactly as follows:
-
-<thought>
-Your reasoning here...
-</thought>
-
-` + "```json" + `
-{
-  "name": "calculator",
-  "input": "expression to calculate"
-}
-` + "```" + `
-
-This exact format is critical for the tool parser to work properly.`)
+	// Set model if needed
+	provider.SetModel("claude-3-sonnet-20240229")
 	provider.SetMaxTokens(1000)
 
 	// Create a ReAct agent
@@ -56,8 +41,8 @@ Your reasoning here...
 
 ` + "```json" + `
 {
-  "name": "toolName",
-  "input": {"param": "value"}
+  "name": "calculator",
+  "input": {"expression": "math expression"}
 }
 ` + "```" + `
 
@@ -78,6 +63,9 @@ After receiving tool results, provide a concise final answer to the user's quest
 			Required: []string{"expression"},
 		},
 		func(params map[string]interface{}) (string, error) {
+			// Debug output to see what's being passed
+			fmt.Printf("Calculator called with params: %+v\n", params)
+			
 			// Simple calculator that actually evaluates the expression
 			expr, ok := params["expression"].(string)
 			if !ok {

@@ -164,3 +164,15 @@ func (c *BaseClient) HandleToolCall(ctx context.Context, toolName string, input 
 
 	return result, nil
 }
+
+// ErrorResponse is a standard error structure returned by API providers.
+type ErrorResponse struct {
+	Error *ErrorDetail `json:"error,omitempty"`
+}
+
+// ErrorDetail contains the details of an API error.
+type ErrorDetail struct {
+	Message string `json:"message"`
+	Type    string `json:"type,omitempty"`
+	Code    string `json:"code,omitempty"`
+}

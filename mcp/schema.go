@@ -19,7 +19,7 @@ type MCPResponse struct {
 
 // ToolUseResponse represents the results of a tool use request
 type ToolUseResponse struct {
-	ToolName string         `json:"tool_name"`
-	Result   map[string]any `json:"result,omitempty"`
-	Error    string         `json:"error,omitempty"`
+	Name   string         `json:"name"`
+	Result map[string]any `json:"result,omitempty"`
+	Error  string         `json:"error,omitempty"`
 }

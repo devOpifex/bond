@@ -3,6 +3,8 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	
+	"github.com/devOpifex/bond/models"
 )
 
 // Version is the JSON-RPC version
@@ -26,45 +28,14 @@ type Response struct {
 
 // ToolListResult represents the result of a tools/list request
 type ToolListResult struct {
-	Tools      []Tool `json:"tools"`
-	NextCursor string `json:"nextCursor,omitempty"`
-}
-
-// Tool represents a tool definition in the Model Context Protocol
-type Tool struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"inputSchema"`
+	Tools      []models.Tool `json:"tools"`
+	NextCursor string        `json:"nextCursor,omitempty"`
 }
 
 // ToolCallParams represents the parameters for a tools/call request
 type ToolCallParams struct {
 	Name      string         `json:"name"`
 	Arguments map[string]any `json:"arguments"`
-}
-
-// ToolCallResult represents the result of a tools/call request
-type ToolCallResult struct {
-	Content []ToolContent `json:"content"`
-	IsError bool          `json:"isError"`
-}
-
-// ToolContent represents a content item in a tool result
-type ToolContent struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	Data     string `json:"data,omitempty"`
-	MimeType string `json:"mimeType,omitempty"`
-
-	// For resource type content
-	Resource *ResourceContent `json:"resource,omitempty"`
-}
-
-// ResourceContent represents an embedded resource in a tool result
-type ResourceContent struct {
-	URI      string `json:"uri"`
-	MimeType string `json:"mimeType"`
-	Text     string `json:"text,omitempty"`
 }
 
 // Error represents a JSON-RPC 2.0 error object

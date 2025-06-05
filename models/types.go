@@ -23,17 +23,56 @@ type ToolUse struct {
 	Name string `json:"name"`
 	
 	// Input contains the parameters for the tool call as a JSON-formatted string.
-	Input string `json:"input"`
+	// This can be a JSON string or structured parameters depending on the provider.
+	Input interface{} `json:"input"`
 }
 
 // ToolResult represents the result of a tool execution.
 // It's used to track and communicate the outcome of tool calls back to the AI.
 type ToolResult struct {
-	// ToolName is the name of the tool that was executed.
-	ToolName string `json:"tool_name"`
+	// Name is the name of the tool that was executed.
+	Name string `json:"name"`
 	
 	// Result contains the string output from the tool execution.
 	Result string `json:"result"`
+	
+	// Content contains structured output when plain text is insufficient.
+	// This is used for rich content like images, tables, or other structured data.
+	Content []ContentItem `json:"content,omitempty"`
+	
+	// IsError indicates if the tool execution resulted in an error.
+	IsError bool `json:"is_error,omitempty"`
+}
+
+// ContentItem represents a single piece of content in a tool result.
+// It can be text, binary data, or a reference to a resource.
+type ContentItem struct {
+	// Type is the kind of content (text, data, resource).
+	Type string `json:"type"`
+	
+	// Text is the text content, if applicable.
+	Text string `json:"text,omitempty"`
+	
+	// Data is the binary data, if applicable, encoded as a base64 string.
+	Data string `json:"data,omitempty"`
+	
+	// MimeType is the MIME type of the content.
+	MimeType string `json:"mime_type,omitempty"`
+	
+	// Resource is a reference to an external resource, if applicable.
+	Resource *Resource `json:"resource,omitempty"`
+}
+
+// Resource represents an external resource referenced in a content item.
+type Resource struct {
+	// URI is the location of the resource.
+	URI string `json:"uri"`
+	
+	// MimeType is the MIME type of the resource.
+	MimeType string `json:"mime_type"`
+	
+	// Text is an optional text representation of the resource.
+	Text string `json:"text,omitempty"`
 }
 
 // Message represents a single message in a conversation with an AI model.

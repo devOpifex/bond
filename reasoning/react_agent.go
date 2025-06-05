@@ -125,6 +125,8 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 
 		// If there's a tool to use, execute it
 		if toolUse != nil {
+			fmt.Printf("Tool use detected: %s with input: %v\n", toolUse.Name, toolUse.Input)
+			
 			// Find the tool
 			tool, exists := ra.tools[toolUse.Name]
 			if !exists {
@@ -132,19 +134,30 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				ra.messages = append(ra.messages, models.Message{
 					Role:       models.RoleFunction,
 					Content:    toolResult,
-					ToolResult: &models.ToolResult{ToolName: toolUse.Name, Result: toolResult},
+					ToolResult: &models.ToolResult{Name: toolUse.Name, Result: toolResult},
 				})
 				continue
 			}
 
 			// Parse the input
 			var inputJSON json.RawMessage
-			if err := json.Unmarshal([]byte(toolUse.Input), &inputJSON); err != nil {
+			inputBytes, err := json.Marshal(toolUse.Input)
+			if err != nil {
+				toolResult := fmt.Sprintf("Error: Invalid tool input: %v", err)
+				ra.messages = append(ra.messages, models.Message{
+					Role:       models.RoleFunction,
+					Content:    toolResult,
+					ToolResult: &models.ToolResult{Name: toolUse.Name, Result: toolResult},
+				})
+				continue
+			}
+			
+			if err := json.Unmarshal(inputBytes, &inputJSON); err != nil {
 				toolResult := fmt.Sprintf("Error: Invalid tool input JSON: %v", err)
 				ra.messages = append(ra.messages, models.Message{
 					Role:       models.RoleFunction,
 					Content:    toolResult,
-					ToolResult: &models.ToolResult{ToolName: toolUse.Name, Result: toolResult},
+					ToolResult: &models.ToolResult{Name: toolUse.Name, Result: toolResult},
 				})
 				continue
 			}
@@ -156,7 +169,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 				ra.messages = append(ra.messages, models.Message{
 					Role:       models.RoleFunction,
 					Content:    toolResult,
-					ToolResult: &models.ToolResult{ToolName: toolUse.Name, Result: toolResult},
+					ToolResult: &models.ToolResult{Name: toolUse.Name, Result: toolResult},
 				})
 				continue
 			}
@@ -168,7 +181,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 			functionMessage := models.Message{
 				Role:       models.RoleFunction,
 				Content:    result,
-				ToolResult: &models.ToolResult{ToolName: toolUse.Name, Result: result},
+				ToolResult: &models.ToolResult{Name: toolUse.Name, Result: result},
 			}
 			ra.messages = append(ra.messages, functionMessage)
 		}
@@ -207,35 +220,38 @@ func parseResponse(response string) (*models.ToolUse, string, bool) {
 		}
 		
 		toolJSON := strings.TrimSpace(response[startIdx : startIdx+endIdx])
+		fmt.Printf("Found tool JSON: %s\n", toolJSON)
 		
 		// Parse the tool use JSON manually to handle different input formats
 		var rawToolUse map[string]interface{}
 		if err := json.Unmarshal([]byte(toolJSON), &rawToolUse); err != nil {
+			fmt.Printf("Error parsing tool JSON: %v\n", err)
 			return nil, response, false
 		}
 		
 		// Extract name and input
 		name, ok := rawToolUse["name"].(string)
 		if !ok {
+			fmt.Printf("No 'name' field found in tool JSON\n")
 			return nil, response, false
 		}
 		
 		// Handle input which can be a string or an object
-		var inputStr string
+		var inputStr interface{}
 		if inputObj, ok := rawToolUse["input"].(map[string]interface{}); ok {
-			// Input is an object, convert it to a JSON string
-			inputJSON, err := json.Marshal(inputObj)
-			if err != nil {
-				return nil, response, false
+			// Input is an object, use it directly
+			inputStr = inputObj
+		} else if inputStr, ok = rawToolUse["input"].(string); ok {
+			// Input is a string, try to parse it as JSON if it looks like JSON
+			if strings.TrimSpace(inputStr.(string))[0] == '{' {
+				var jsonInput map[string]interface{}
+				if err := json.Unmarshal([]byte(inputStr.(string)), &jsonInput); err == nil {
+					inputStr = jsonInput
+				}
 			}
-			inputStr = string(inputJSON)
-		} else if inputStr, ok = rawToolUse["input"].(string); !ok {
-			// Try marshaling whatever input is
-			inputJSON, err := json.Marshal(rawToolUse["input"])
-			if err != nil {
-				return nil, response, false
-			}
-			inputStr = string(inputJSON)
+		} else {
+			// Use whatever input is
+			inputStr = rawToolUse["input"]
 		}
 		
 		toolUse := models.ToolUse{

@@ -91,18 +91,12 @@ func (m *MCP) RegisterTool(tool models.ToolExecutor) error {
 	return m.toolRegistry.Register(tool)
 }
 
-// convertToMCPTool converts a Bond tool to an MCP tool definition
-func convertToMCPTool(tool models.ToolExecutor) Tool {
-	schema, err := json.Marshal(tool.GetSchema())
-	if err != nil {
-		// If there's an error marshaling the schema, provide a minimal valid schema
-		schema = []byte(`{"type": "object", "properties": {}}`)
-	}
-	
-	return Tool{
+// convertToMCPTool converts a Bond tool to an MCP-compatible tool definition
+func convertToMCPTool(tool models.ToolExecutor) models.Tool {
+	return models.Tool{
 		Name:        tool.GetName(),
 		Description: tool.GetDescription(),
-		InputSchema: schema,
+		InputSchema: tool.GetSchema(),
 	}
 }
 
@@ -398,7 +392,7 @@ func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
 	
 	// If MCP is not running, return the local tool registry
 	tools := m.toolRegistry.GetAll()
-	mcpTools := make([]Tool, 0, len(tools))
+	mcpTools := make([]models.Tool, 0, len(tools))
 	
 	for _, tool := range tools {
 		mcpTools = append(mcpTools, convertToMCPTool(tool))
@@ -410,7 +404,7 @@ func (m *MCP) ListTools(cursor string) (*ToolListResult, error) {
 }
 
 // CallTool invokes a tool on the MCP server with the given name and arguments
-func (m *MCP) CallTool(name string, arguments map[string]any) (*ToolCallResult, error) {
+func (m *MCP) CallTool(name string, arguments map[string]any) (*models.ToolResult, error) {
 	m.runningMtx.Lock()
 	running := m.running
 	m.runningMtx.Unlock()
@@ -431,15 +425,66 @@ func (m *MCP) CallTool(name string, arguments map[string]any) (*ToolCallResult, 
 			return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
 		}
 
-		// Convert the result to a ToolCallResult
+		// Convert the result to a ToolResult
 		resultBytes, err := json.Marshal(response.Result)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal tool call result: %w", err)
 		}
 
-		var toolResult ToolCallResult
+		// First try to unmarshal into our standard format
+		var toolResult models.ToolResult
 		if err := json.Unmarshal(resultBytes, &toolResult); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal tool call result: %w", err)
+			// If that fails, try to handle the legacy MCP format
+			var mcpResult struct {
+				Content []struct {
+					Type     string `json:"type"`
+					Text     string `json:"text,omitempty"`
+					Data     string `json:"data,omitempty"`
+					MimeType string `json:"mimeType,omitempty"`
+					Resource *struct {
+						URI      string `json:"uri"`
+						MimeType string `json:"mimeType"`
+						Text     string `json:"text,omitempty"`
+					} `json:"resource,omitempty"`
+				} `json:"content"`
+				IsError bool `json:"isError"`
+			}
+
+			if err := json.Unmarshal(resultBytes, &mcpResult); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal tool call result: %w", err)
+			}
+
+			// Convert to our standard format
+			toolResult = models.ToolResult{
+				Name:    name,
+				IsError: mcpResult.IsError,
+				Content: make([]models.ContentItem, 0, len(mcpResult.Content)),
+			}
+
+			// Convert each content item
+			for _, item := range mcpResult.Content {
+				contentItem := models.ContentItem{
+					Type:     item.Type,
+					Text:     item.Text,
+					Data:     item.Data,
+					MimeType: item.MimeType,
+				}
+
+				if item.Resource != nil {
+					contentItem.Resource = &models.Resource{
+						URI:      item.Resource.URI,
+						MimeType: item.Resource.MimeType,
+						Text:     item.Resource.Text,
+					}
+				}
+
+				toolResult.Content = append(toolResult.Content, contentItem)
+			}
+
+			// If we have a single text item, set it as the Result for backward compatibility
+			if len(mcpResult.Content) == 1 && mcpResult.Content[0].Type == "text" {
+				toolResult.Result = mcpResult.Content[0].Text
+			}
 		}
 
 		return &toolResult, nil
@@ -460,26 +505,30 @@ func (m *MCP) CallTool(name string, arguments map[string]any) (*ToolCallResult, 
 	// Execute the tool
 	result, err := tool.Execute(argsBytes)
 	if err != nil {
-		return &ToolCallResult{
-			Content: []ToolContent{
+		return &models.ToolResult{
+			Name:    name,
+			Result:  fmt.Sprintf("Error executing tool: %v", err),
+			IsError: true,
+			Content: []models.ContentItem{
 				{
 					Type: "text",
 					Text: fmt.Sprintf("Error executing tool: %v", err),
 				},
 			},
-			IsError: true,
 		}, nil
 	}
 	
 	// Return the result
-	return &ToolCallResult{
-		Content: []ToolContent{
+	return &models.ToolResult{
+		Name:    name,
+		Result:  result,
+		IsError: false,
+		Content: []models.ContentItem{
 			{
 				Type: "text",
 				Text: result,
 			},
 		},
-		IsError: false,
 	}, nil
 }
 

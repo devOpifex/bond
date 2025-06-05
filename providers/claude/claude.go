@@ -1,151 +1,136 @@
-// Package claude implements the Anthropic Claude API integration for the Bond framework.
-// It provides a client for communicating with Claude models, handling message formatting,
-// tool calls, and response parsing according to Claude's specific API requirements.
+// Package claude implements the Provider interface for Anthropic's Claude models.
+// It handles communication with Claude's API, including message formatting,
+// tool registration, and configuration of model parameters.
 package claude
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/devOpifex/bond/models"
 	"github.com/devOpifex/bond/providers/common"
 )
 
-// ClaudeRequest represents a request to the Claude API.
-// It follows the structure expected by Anthropic's Messages API.
-type ClaudeRequest struct {
-	// Model specifies which Claude model version to use
-	Model string `json:"model"`
-
-	// MaxTokens limits the length of the response
-	MaxTokens int `json:"max_tokens"`
-
-	// System contains instructions that guide Claude's behavior
-	System string `json:"system,omitempty"`
-
-	// Messages contains the conversation history
-	Messages []models.Message `json:"messages"`
-
-	// Tools defines functions that Claude can call
-	Tools []models.Tool `json:"tools,omitempty"`
+// Provider implements the Provider interface for Claude AI models.
+// It manages the connection to Claude's API and handles the specific
+// requirements of Claude's message format and API interactions.
+type Provider struct {
+	// APIKey is the authentication token for Claude's API
+	APIKey string
 	
-	// Temperature controls randomness in Claude's response generation
-	// Higher values make output more random, lower values make it more deterministic
-	Temperature float64 `json:"temperature,omitempty"`
+	// BaseURL is the endpoint for Claude's API
+	BaseURL string
+	
+	// Model specifies which Claude model to use
+	Model string
+	
+	// HTTPClient is used for making requests to Claude's API
+	HTTPClient *http.Client
+	
+	// System prompt provides context and instructions for the model
+	SystemPrompt string
+	
+	// MaxTokens limits the length of the model's response
+	MaxTokens int
+	
+	// Temperature controls randomness in the model's output (0.0-1.0)
+	Temperature float64
+	
+	// Tools that have been registered for use with this provider
+	Tools []models.ToolExecutor
 }
 
-// ClaudeResponse represents a response from the Claude API.
-// It contains content blocks and metadata about why the response ended.
-type ClaudeResponse struct {
-	// Content contains the response blocks (text or tool calls)
-	Content []ContentBlock `json:"content"`
-
-	// StopReason indicates why Claude stopped generating (length, tool_use, etc.)
-	StopReason string `json:"stop_reason"`
-}
-
-// ContentBlock represents a single block in a Claude response.
-// It can be either text content or a tool use request.
-type ContentBlock struct {
-	// Type indicates the block type ("text" or "tool_use")
-	Type string `json:"type"`
-
-	// Text contains the response text for text blocks
-	Text string `json:"text,omitempty"`
-
-	// Name contains the tool name for tool_use blocks
-	Name string `json:"name,omitempty"`
-
-	// Input contains the parameters for tool calls
-	Input json.RawMessage `json:"input,omitempty"`
-}
-
-// Client is the Claude API client implementation.
-// It handles communication with the Anthropic API, including authentication,
-// request formatting, and response parsing. It implements the models.Provider interface.
-type Client struct {
-	common.BaseClient
-}
-
-// NewClient creates a new Claude client with the provided API key.
-// It initializes the client with default settings for the Claude API.
-func NewClient(apiKey string) *Client {
-	baseClient := common.NewBaseClient(
-		apiKey,
-		"https://api.anthropic.com/v1/messages",
-		"claude-3-sonnet-20240229",
-	)
-
-	return &Client{
-		BaseClient: baseClient,
+// New creates a new Claude provider with the given API key.
+// It sets up default values that can be customized through
+// the provider's configuration methods.
+func New(apiKey string) *Provider {
+	return &Provider{
+		APIKey:      apiKey,
+		BaseURL:     "https://api.anthropic.com/v1/messages",
+		Model:       "claude-3-opus-20240229",
+		HTTPClient:  &http.Client{Timeout: 60 * time.Second},
+		MaxTokens:   1024,
+		Temperature: 0.7,
+		Tools:       []models.ToolExecutor{},
 	}
 }
 
-// SendMessage sends a message with specified role to Claude and returns the response.
-// This implements part of the models.Provider interface for basic message exchange
-// without tool capabilities.
-func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
-	// Get message history from context or create a new one
+// NewClient is an alias for New to maintain backward compatibility
+func NewClient(apiKey string) *Provider {
+	return New(apiKey)
+}
+
+// SetSystemPrompt sets the system prompt that guides Claude's behavior.
+// The system prompt is included at the beginning of each conversation
+// to provide context and instructions to the model.
+func (p *Provider) SetSystemPrompt(prompt string) {
+	p.SystemPrompt = prompt
+}
+
+// SetModel configures which specific Claude model to use.
+// Available models include "claude-3-opus-20240229", "claude-3-sonnet-20240229", etc.
+func (p *Provider) SetModel(model string) {
+	p.Model = model
+}
+
+// SetMaxTokens configures the maximum number of tokens in Claude's response.
+// Higher values allow for longer responses but may impact performance.
+func (p *Provider) SetMaxTokens(tokens int) {
+	p.MaxTokens = tokens
+}
+
+// SetTemperature configures the randomness of Claude's responses.
+// Values closer to 0 make responses more deterministic, while
+// values closer to 1 make responses more creative and varied.
+func (p *Provider) SetTemperature(temperature float64) {
+	p.Temperature = temperature
+}
+
+// RegisterTool adds a tool to the provider's available tools.
+// These tools will be included in the API request to Claude,
+// allowing the model to use them during its reasoning process.
+func (p *Provider) RegisterTool(tool models.ToolExecutor) {
+	// Check if the tool is already registered
+	for _, existingTool := range p.Tools {
+		if existingTool.GetName() == tool.GetName() {
+			// Tool with this name already exists, don't add it again
+			return
+		}
+	}
+	
+	// Tool not registered yet, add it
+	p.Tools = append(p.Tools, tool)
+}
+
+// SendMessage sends a message to Claude and returns the model's response.
+// This method does not include tool information in the request.
+func (p *Provider) SendMessage(ctx context.Context, message models.Message) (string, error) {
+	return p.sendRequest(ctx, message, false)
+}
+
+// SendMessageWithTools sends a message to Claude with available tools.
+// This method includes information about registered tools in the request,
+// allowing Claude to call these tools during its reasoning process.
+func (p *Provider) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
+	return p.sendRequest(ctx, message, true)
+}
+
+// prepareChatContext constructs the conversation history to send to Claude.
+// It handles extracting message history from the context if available,
+// and applying Claude-specific formatting for tool results.
+func (p *Provider) prepareChatContext(ctx context.Context, message models.Message) []models.Message {
+	// Extract message history from context if available
 	var messageHistory []models.Message
-	historyValue := ctx.Value("message_history")
-	if historyValue != nil {
-		if history, ok := historyValue.([]models.Message); ok {
-			messageHistory = history
-		}
-	}
-
-	// Add the current message to history
-	messageHistory = append(messageHistory, message)
-
-	// Create a clean message list for Claude with only supported roles (user/assistant)
-	var cleanMessages []models.Message
-	for _, msg := range messageHistory {
-		// Skip any messages with unsupported roles
-		if msg.Role == models.RoleUser || msg.Role == models.RoleAssistant {
-			cleanMessages = append(cleanMessages, msg)
-		}
-	}
-
-	request := ClaudeRequest{
-		Model:       c.Model,
-		MaxTokens:   c.MaxTokens,
-		Messages:    cleanMessages,
-		Temperature: c.Temperature,
-	}
-
-	// Add system prompt if set
-	if c.SystemPrompt != "" {
-		request.System = c.SystemPrompt
-	}
-
-	// Update message history in context for next call
-	ctx = context.WithValue(ctx, "message_history", messageHistory)
-
-	return c.sendRequest(ctx, request)
-}
-
-// SendMessageWithTools sends a message with specified role to Claude with registered tools.
-// This implements part of the models.Provider interface for advanced interactions
-// where the model may need to call tools during its reasoning process.
-func (c *Client) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
-	// Convert registered tools to Claude tool format
-	var tools []models.Tool
-	for _, tool := range c.Tools {
-		tools = append(tools, models.Tool{
-			Name:        tool.GetName(),
-			Description: tool.GetDescription(),
-			InputSchema: tool.GetSchema(),
-		})
-	}
-
-	// Get message history from context or create a new one
-	var messageHistory []models.Message
-	historyValue := ctx.Value("message_history")
-	if historyValue != nil {
-		if history, ok := historyValue.([]models.Message); ok {
-			messageHistory = history
-		}
+	if history, ok := ctx.Value("message_history").([]models.Message); ok {
+		messageHistory = make([]models.Message, len(history))
+		copy(messageHistory, history)
+	} else {
+		messageHistory = []models.Message{}
 	}
 
 	// Special handling for messages to Claude API
@@ -156,7 +141,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		userMsg := models.Message{
 			Role: models.RoleUser,
 			Content: fmt.Sprintf("Tool '%s' returned: %s",
-				message.ToolResult.ToolName, message.Content),
+				message.ToolResult.Name, message.Content),
 		}
 
 		// Add the tool result as a user message to the history
@@ -167,160 +152,162 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	}
 
 	// Create a clean message list for Claude with only supported roles (user/assistant)
-	var cleanMessages []models.Message
-	for _, msg := range messageHistory {
-		// Skip any messages with unsupported roles
-		if msg.Role == models.RoleUser || msg.Role == models.RoleAssistant {
-			cleanMessages = append(cleanMessages, msg)
-		}
-	}
-
-	request := ClaudeRequest{
-		Model:       c.Model,
-		MaxTokens:   c.MaxTokens,
-		Messages:    cleanMessages,
-		Tools:       tools,
-		Temperature: c.Temperature,
-	}
-
-	// Add system prompt if set
-	if c.SystemPrompt != "" {
-		request.System = c.SystemPrompt
-	}
-
-	// Update message history in context for next call
-	ctx = context.WithValue(ctx, "message_history", messageHistory)
-
-	return c.sendRequest(ctx, request)
+	return convertMessagesToClaudeFormat(messageHistory)
 }
 
-// sendRequest sends a request to the Claude API and processes the response.
-// It handles the HTTP communication, error handling, and response parsing.
-// If Claude requests a tool, it manages the tool execution and formats the result.
-func (c *Client) sendRequest(ctx context.Context, request ClaudeRequest) (string, error) {
-	jsonData, err := json.Marshal(request)
+// prepareToolsForRequest converts the registered tools to Claude's API format.
+// It builds a list of tool definitions that Claude can understand and use.
+func (p *Provider) prepareToolsForRequest() []map[string]interface{} {
+	toolDefinitions := make([]map[string]interface{}, 0, len(p.Tools))
+	
+	for _, tool := range p.Tools {
+		// Convert each tool to Claude's expected format
+		schema := tool.GetSchema()
+		
+		// Convert the schema to a JSON Schema compatible format
+		toolDef := map[string]interface{}{
+			"name":        tool.GetName(),
+			"description": tool.GetDescription(),
+			"input_schema": map[string]interface{}{
+				"type":       schema.Type,
+				"properties": schema.Properties,
+			},
+		}
+		
+		// Add required fields if any
+		if len(schema.Required) > 0 {
+			toolDef["input_schema"].(map[string]interface{})["required"] = schema.Required
+		}
+		
+		toolDefinitions = append(toolDefinitions, toolDef)
+	}
+	
+	return toolDefinitions
+}
+
+// sendRequest handles the common logic for sending requests to Claude's API.
+// It prepares the request payload, sends it to the API, and processes the response.
+func (p *Provider) sendRequest(ctx context.Context, message models.Message, withTools bool) (string, error) {
+	// Build the Claude-formatted messages
+	messages := p.prepareChatContext(ctx, message)
+	
+	// Create the request payload
+	payload := map[string]interface{}{
+		"model":       p.Model,
+		"messages":    messages,
+		"max_tokens":  p.MaxTokens,
+		"temperature": p.Temperature,
+	}
+	
+	// Add system prompt if provided
+	if p.SystemPrompt != "" {
+		payload["system"] = p.SystemPrompt
+	}
+	
+	// Add tools if requested and available
+	if withTools && len(p.Tools) > 0 {
+		payload["tools"] = p.prepareToolsForRequest()
+	}
+	
+	// Convert the payload to JSON
+	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal Claude request: %w", err)
 	}
-
-	// Prepare HTTP request
-	headers := map[string]string{
-		"Content-Type":      "application/json",
-		"x-api-key":         c.ApiKey,
-		"anthropic-version": "2023-06-01",
+	
+	// Create the HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", p.BaseURL, strings.NewReader(string(payloadBytes)))
+	if err != nil {
+		return "", fmt.Errorf("failed to create Claude request: %w", err)
 	}
-
-	httpReq := common.HTTPRequest{
-		Method:  "POST",
-		URL:     c.BaseURL,
-		Headers: headers,
-		Body:    jsonData,
-	}
-
+	
+	// Set the required headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", p.APIKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	
 	// Send the request
-	body, err := c.DoHTTPRequest(ctx, httpReq)
+	resp, err := p.HTTPClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Claude API request failed: %w", err)
 	}
-
-	var claudeResp ClaudeResponse
+	defer resp.Body.Close()
+	
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read Claude API response: %w", err)
+	}
+	
+	// Check for API error
+	if resp.StatusCode != http.StatusOK {
+		// Try to parse the error message
+		var errorResp common.ErrorResponse
+		if err := json.Unmarshal(body, &errorResp); err == nil && errorResp.Error != nil {
+			return "", fmt.Errorf("Claude API error (%d): %s", resp.StatusCode, errorResp.Error.Message)
+		}
+		return "", fmt.Errorf("Claude API error (%d): %s", resp.StatusCode, string(body))
+	}
+	
+	// Parse the successful response
+	var claudeResp struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	
 	if err := json.Unmarshal(body, &claudeResp); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse Claude API response: %w", err)
 	}
-
-	// If stop_reason is "tool_use", Claude wants to use a tool
-	if claudeResp.StopReason == "tool_use" {
-		// Find the tool_use block
-		var toolUseBlock *ContentBlock
-		var textBlocks []string
-
-		for _, block := range claudeResp.Content {
-			if block.Type == "tool_use" {
-				toolUseBlock = &block
-			} else if block.Type == "text" {
-				textBlocks = append(textBlocks, block.Text)
-			}
-		}
-
-		if toolUseBlock != nil {
-			result, err := c.HandleToolCall(ctx, toolUseBlock.Name, toolUseBlock.Input)
-			if err != nil {
-				return "", err
-			}
-
-			// Format response as expected by ReAct agent
-			thoughtText := ""
-			if len(textBlocks) > 0 {
-				thoughtText = "<thought>\n"
-				for _, text := range textBlocks {
-					thoughtText += text + "\n"
-				}
-				thoughtText += "</thought>\n\n"
-			}
-
-			// Convert raw input JSON to a string for the ReAct format
-			var inputMap map[string]interface{}
-			json.Unmarshal(toolUseBlock.Input, &inputMap)
-			inputJSON, _ := json.Marshal(map[string]interface{}{
-				"expression": fmt.Sprintf("%v", inputMap["expression"]),
-			})
-
-			toolJSON, _ := json.Marshal(map[string]interface{}{
-				"name":  toolUseBlock.Name,
-				"input": string(inputJSON),
-			})
-
-			combinedResponse := fmt.Sprintf("%s```json\n%s\n```\n\nTool result: %s",
-				thoughtText, string(toolJSON), result)
-
-			// Add tool response to message history
-			historyValue := ctx.Value("message_history")
-			if historyValue != nil {
-				if messageHistory, ok := historyValue.([]models.Message); ok {
-					// Create assistant message with the tool response
-					assistantMessage := models.Message{
-						Role:    models.RoleAssistant,
-						Content: combinedResponse,
-					}
-
-					// Add to history and update context
-					messageHistory = append(messageHistory, assistantMessage)
-					ctx = context.WithValue(ctx, "message_history", messageHistory)
-				}
-			}
-
-			return combinedResponse, nil
+	
+	// Extract the text from the response
+	var responseText string
+	for _, content := range claudeResp.Content {
+		if content.Type == "text" {
+			responseText += content.Text
 		}
 	}
+	
+	return responseText, nil
+}
 
-	// If Claude didn't request a tool or we couldn't find the tool_use block,
-	// just return any text blocks
-	var textResponse string
-	for _, block := range claudeResp.Content {
-		if block.Type == "text" {
-			textResponse += block.Text
-		}
-	}
-
-	if textResponse != "" {
-		// Add assistant's response to message history
-		historyValue := ctx.Value("message_history")
-		if historyValue != nil {
-			if messageHistory, ok := historyValue.([]models.Message); ok {
-				// Create assistant message with the response
-				assistantMessage := models.Message{
-					Role:    models.RoleAssistant,
-					Content: textResponse,
-				}
-
-				// Add to history and update context
-				messageHistory = append(messageHistory, assistantMessage)
-				ctx = context.WithValue(ctx, "message_history", messageHistory)
+// convertMessagesToClaudeFormat transforms our internal message format to Claude's API format.
+// Claude only supports user and assistant roles, so this function handles the conversion
+// of system and function messages appropriately.
+func convertMessagesToClaudeFormat(messages []models.Message) []models.Message {
+	// Claude only supports user and assistant roles
+	claudeMessages := []models.Message{}
+	
+	for _, msg := range messages {
+		switch msg.Role {
+		case models.RoleUser:
+			// User messages pass through directly
+			claudeMessages = append(claudeMessages, msg)
+		case models.RoleAssistant:
+			// Assistant messages pass through directly
+			claudeMessages = append(claudeMessages, msg)
+		case models.RoleSystem:
+			// System messages in Claude are handled separately, not as a message
+			// We don't include them in the messages array
+			continue
+		case models.RoleFunction:
+			// Function messages are transformed to user messages in the prepare method
+			// This should already be handled, but just in case
+			userMsg := models.Message{
+				Role:    models.RoleUser,
+				Content: fmt.Sprintf("Function returned: %s", msg.Content),
 			}
+			claudeMessages = append(claudeMessages, userMsg)
+		default:
+			// Unknown roles are sent as user messages
+			userMsg := models.Message{
+				Role:    models.RoleUser,
+				Content: msg.Content,
+			}
+			claudeMessages = append(claudeMessages, userMsg)
 		}
-
-		return textResponse, nil
 	}
-
-	return "No response received", nil
+	
+	return claudeMessages
 }

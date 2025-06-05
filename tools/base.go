@@ -16,15 +16,15 @@ import (
 type BaseTool struct {
 	// Name is the identifier used to call this tool
 	Name string
-	
+
 	// Description explains what the tool does, helping the AI decide when to use it
 	Description string
-	
+
 	// Schema defines the structure of inputs that this tool accepts
 	Schema models.InputSchema
-	
+
 	// Handler is the function that implements the tool's actual functionality
-	Handler func(params map[string]interface{}) (string, error)
+	Handler func(params map[string]any) (string, error)
 }
 
 // GetName returns the tool's name, which is used to identify it when called.
@@ -54,7 +54,7 @@ func (b *BaseTool) Execute(input json.RawMessage) (string, error) {
 	}
 
 	// Parse the input into a generic map
-	var params map[string]interface{}
+	var params map[string]any
 	if err := json.Unmarshal(input, &params); err != nil {
 		return "", err
 	}
@@ -71,7 +71,7 @@ func (b *BaseTool) Execute(input json.RawMessage) (string, error) {
 
 // NewTool creates a new BaseTool instance with the provided configuration.
 // This is a convenience function for creating tools with proper input validation.
-func NewTool(name, description string, schema models.InputSchema, handler func(map[string]interface{}) (string, error)) *BaseTool {
+func NewTool(name, description string, schema models.InputSchema, handler func(map[string]any) (string, error)) *BaseTool {
 	return &BaseTool{
 		Name:        name,
 		Description: description,
@@ -79,3 +79,4 @@ func NewTool(name, description string, schema models.InputSchema, handler func(m
 		Handler:     handler,
 	}
 }
+

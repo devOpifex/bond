@@ -63,4 +63,3 @@ func main() {
 
 	fmt.Printf("Claude's response: %s\n", response)
 }
-

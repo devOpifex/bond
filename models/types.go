@@ -91,20 +91,6 @@ type Message struct {
 	ToolResult *ToolResult `json:"tool_result,omitempty"`
 }
 
-// Tool defines a function that the AI model can call during its reasoning process.
-// This structure is used to register tools with the provider and inform the AI
-// about available tools and their parameters.
-type Tool struct {
-	// Name is the identifier used to call this tool.
-	Name string `json:"name"`
-
-	// Description explains what the tool does, helping the AI decide when to use it.
-	Description string `json:"description"`
-
-	// InputSchema defines the expected structure of inputs to the tool.
-	InputSchema InputSchema `json:"input_schema"`
-}
-
 // InputSchema defines the structure of tool inputs following a simplified JSON Schema format.
 // It specifies the parameters a tool accepts, their types, and which ones are required.
 type InputSchema struct {
@@ -127,4 +113,3 @@ type Property struct {
 	// Description explains what this parameter is used for.
 	Description string `json:"description"`
 }
-

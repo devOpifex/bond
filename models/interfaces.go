@@ -59,7 +59,7 @@ type Provider interface {
 	SetTemperature(temperature float64)
 
 	// register an MCP with the provider
-	registerMCP(command string, args []string) error
+	RegisterMCP(command string, args []string) error
 }
 
 // Agent defines the interface that all AI agents must implement.
@@ -72,4 +72,3 @@ type Agent interface {
 	// or other state information needed for processing.
 	Process(ctx context.Context, input string) (string, error)
 }
-

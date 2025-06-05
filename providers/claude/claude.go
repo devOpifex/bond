@@ -359,7 +359,7 @@ func convertMessagesToClaudeFormat(messages []models.Message) []models.Message {
 	return claudeMessages
 }
 
-func (p *Provider) registerMCP(command string, args []string) error {
+func (p *Provider) RegisterMCP(command string, args []string) error {
 	client := mcp.New(command, args)
 	p.MCPs[command] = client
 

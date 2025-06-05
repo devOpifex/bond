@@ -3,8 +3,8 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
-	
-	"github.com/devOpifex/bond/models"
+
+	"github.com/devOpifex/bond/tools"
 )
 
 // Version is the JSON-RPC version
@@ -28,8 +28,8 @@ type Response struct {
 
 // ToolListResult represents the result of a tools/list request
 type ToolListResult struct {
-	Tools      []models.Tool `json:"tools"`
-	NextCursor string        `json:"nextCursor,omitempty"`
+	Tools      []tools.BaseTool `json:"tools"`
+	NextCursor string           `json:"nextCursor,omitempty"`
 }
 
 // ToolCallParams represents the parameters for a tools/call request

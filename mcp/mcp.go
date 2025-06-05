@@ -92,16 +92,16 @@ func (m *MCP) RegisterTool(tool models.ToolExecutor) error {
 }
 
 // GetRegistry returns the MCP tool registry
-func (m *MCP) GetRegistry(tool models.ToolExecutor) []models.Tool {
+func (m *MCP) GetRegistry() []models.ToolExecutor {
 	return m.toolRegistry.GetAll()
 }
 
 // convertToMCPTool converts a Bond tool to an MCP-compatible tool definition
-func convertToMCPTool(tool models.ToolExecutor) models.Tool {
-	return models.Tool{
+func convertToMCPTool(tool models.ToolExecutor) tools.BaseTool {
+	return tools.BaseTool{
 		Name:        tool.GetName(),
 		Description: tool.GetDescription(),
-		InputSchema: tool.GetSchema(),
+		Schema:      tool.GetSchema(),
 	}
 }
 
@@ -390,10 +390,10 @@ func (m *MCP) ListTools() (*ToolListResult, error) {
 	}
 
 	// If MCP is not running, return the local tool registry
-	tools := m.toolRegistry.GetAll()
-	mcpTools := make([]models.Tool, 0, len(tools))
+	tls := m.toolRegistry.GetAll()
+	mcpTools := make([]tools.BaseTool, 0, len(tls))
 
-	for _, tool := range tools {
+	for _, tool := range tls {
 		mcpTools = append(mcpTools, convertToMCPTool(tool))
 	}
 

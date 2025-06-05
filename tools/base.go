@@ -79,4 +79,3 @@ func NewTool(name, description string, schema models.InputSchema, handler func(m
 		Handler:     handler,
 	}
 }
-

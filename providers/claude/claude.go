@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/devOpifex/bond/mcp"
 	"github.com/devOpifex/bond/models"
 	"github.com/devOpifex/bond/providers/common"
 )
@@ -43,6 +44,8 @@ type Provider struct {
 
 	// Tools that have been registered for use with this provider
 	Tools []models.ToolExecutor
+
+	MCPs map[string]*mcp.MCP
 }
 
 // New creates a new Claude provider with the given API key.
@@ -57,6 +60,7 @@ func New(apiKey string) *Provider {
 		MaxTokens:   1024,
 		Temperature: 0.7,
 		Tools:       []models.ToolExecutor{},
+		MCPs:        make(map[string]*mcp.MCP),
 	}
 }
 
@@ -355,3 +359,14 @@ func convertMessagesToClaudeFormat(messages []models.Message) []models.Message {
 	return claudeMessages
 }
 
+func (p *Provider) registerMCP(command string, args []string) error {
+	client := mcp.New(command, args)
+	p.MCPs[command] = client
+
+	err := client.Start()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

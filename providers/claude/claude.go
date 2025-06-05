@@ -117,6 +117,10 @@ func (p *Provider) SendMessage(ctx context.Context, message models.Message) (str
 // This method includes information about registered tools in the request,
 // allowing Claude to call these tools during its reasoning process.
 func (p *Provider) SendMessageWithTools(ctx context.Context, message models.Message) (string, error) {
+	fmt.Printf("SendMessageWithTools called with %d registered tools\n", len(p.Tools))
+	for i, tool := range p.Tools {
+		fmt.Printf("Tool %d: %s - %s\n", i, tool.GetName(), tool.GetDescription())
+	}
 	return p.sendRequest(ctx, message, true)
 }
 
@@ -206,7 +210,9 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 	
 	// Add tools if requested and available
 	if withTools && len(p.Tools) > 0 {
-		payload["tools"] = p.prepareToolsForRequest()
+		toolDefinitions := p.prepareToolsForRequest()
+		fmt.Printf("Sending %d tool definitions to Claude\n", len(toolDefinitions))
+		payload["tools"] = toolDefinitions
 	}
 	
 	// Convert the payload to JSON
@@ -250,26 +256,73 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 	}
 	
 	// Parse the successful response
+	fmt.Printf("Got successful response from Claude: %s\n", string(body))
+	
 	var claudeResp struct {
 		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
+			Type  string          `json:"type"`
+			Text  string          `json:"text,omitempty"`
+			Name  string          `json:"name,omitempty"`
+			Input json.RawMessage `json:"input,omitempty"`
 		} `json:"content"`
+		StopReason string `json:"stop_reason"`
 	}
 	
 	if err := json.Unmarshal(body, &claudeResp); err != nil {
 		return "", fmt.Errorf("failed to parse Claude API response: %w", err)
 	}
 	
+	// Check if Claude wants to use a tool
+	if claudeResp.StopReason == "tool_use" {
+		// Find the tool use request
+		for _, content := range claudeResp.Content {
+			if content.Type == "tool_use" {
+				fmt.Printf("Tool use request: %s with input %s\n", content.Name, string(content.Input))
+				
+				// Find the tool
+				tool, exists := p.findTool(content.Name)
+				if !exists {
+					return fmt.Sprintf("Error: Tool '%s' not found", content.Name), nil
+				}
+				
+				// Execute the tool
+				result, err := tool.Execute(content.Input)
+				if err != nil {
+					return fmt.Sprintf("Error executing tool '%s': %v", content.Name, err), nil
+				}
+				
+				// Now we need to send the tool result back to Claude in a new request
+				toolResultMessage := models.Message{
+					Role:    models.RoleUser,
+					Content: fmt.Sprintf("Tool '%s' returned: %s", content.Name, result),
+				}
+				
+				// Recursive call to send the tool result back to Claude
+				return p.sendRequest(ctx, toolResultMessage, true)
+			}
+		}
+	}
+	
 	// Extract the text from the response
 	var responseText string
 	for _, content := range claudeResp.Content {
+		fmt.Printf("Response content type: %s\n", content.Type)
 		if content.Type == "text" {
 			responseText += content.Text
 		}
 	}
 	
 	return responseText, nil
+}
+
+// findTool looks up a tool by name in the provider's tools
+func (p *Provider) findTool(name string) (models.ToolExecutor, bool) {
+	for _, tool := range p.Tools {
+		if tool.GetName() == name {
+			return tool, true
+		}
+	}
+	return nil, false
 }
 
 // convertMessagesToClaudeFormat transforms our internal message format to Claude's API format.

@@ -18,5 +18,6 @@ Keep function and method names short.
 - **Project Structure**: Organized by functionality (providers, tools, reasoning)
 - **Testing**: Table-driven tests in *_test.go files, mocks for dependencies
 - Use `any` instead of `interface{}` where possible
+- Use early returns and avoid `else` blocks
 
 Use `make` commands whenever possible for consistency.

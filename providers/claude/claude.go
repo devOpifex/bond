@@ -280,10 +280,63 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 					return fmt.Sprintf("Error: Tool '%s' not found", content.Name), nil
 				}
 
-				// Execute the tool
-				result, err := tool.Execute(content.Input)
-				if err != nil {
-					return fmt.Sprintf("Error executing tool '%s': %v", content.Name, err), nil
+				var result string
+				var err error
+
+				// Check if this is a namespaced MCP tool
+				if tool.IsNamespaced() {
+					// Extract namespace from tool name
+					parts := strings.Split(tool.GetName(), ":")
+					if len(parts) > 1 {
+						namespace := parts[0]
+						toolName := parts[1]
+
+						// Find the MCP client for this namespace
+						mcpClient, exists := p.MCPs[namespace]
+						if !exists {
+							return fmt.Sprintf("Error: MCP for namespace '%s' not found", namespace), nil
+						}
+
+						// Parse the input JSON
+						var args map[string]any
+						if err := json.Unmarshal(content.Input, &args); err != nil {
+							return fmt.Sprintf("Error parsing tool arguments: %v", err), nil
+						}
+
+						// Call the tool via MCP
+						toolResult, err := mcpClient.CallTool(toolName, args)
+						if err != nil {
+							return fmt.Sprintf("Error executing MCP tool '%s': %v", content.Name, err), nil
+						}
+
+						// Format the result based on content items
+						var formattedResult string
+						if len(toolResult.Content) > 0 {
+							for _, item := range toolResult.Content {
+								switch item.Type {
+								case "text":
+									formattedResult += item.Text
+								case "image":
+									formattedResult += fmt.Sprintf("[Image: %s]", item.MimeType)
+								default:
+									formattedResult += fmt.Sprintf("[Content type: %s]", item.Type)
+								}
+								formattedResult += "\n"
+							}
+							result = strings.TrimSpace(formattedResult)
+						} else {
+							// Fallback to the simple result
+							result = toolResult.Result
+						}
+					} else {
+						return fmt.Sprintf("Error: Invalid namespaced tool format '%s'", content.Name), nil
+					}
+				} else {
+					// Regular tool execution
+					result, err = tool.Execute(content.Input)
+					if err != nil {
+						return fmt.Sprintf("Error executing tool '%s': %v", content.Name, err), nil
+					}
 				}
 
 				// Now we need to send the tool result back to Claude in a new request
@@ -361,12 +414,18 @@ func convertMessagesToClaudeFormat(messages []models.Message) []models.Message {
 
 func (p *Provider) RegisterMCP(command string, args []string) error {
 	client := mcp.New(command, args)
-	p.MCPs[command] = client
 
 	_, err := client.Initialise()
 	if err != nil {
 		return err
 	}
+
+	for _, tool := range client.GetRegistry() {
+		tool.Namespace(command)
+		p.RegisterTool(tool)
+	}
+
+	p.MCPs[command] = client
 
 	return nil
 }

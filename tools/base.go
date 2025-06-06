@@ -7,6 +7,7 @@ package tools
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/devOpifex/bond/models"
 )
@@ -25,6 +26,17 @@ type BaseTool struct {
 
 	// Handler is the function that implements the tool's actual functionality
 	Handler func(params map[string]any) (string, error)
+}
+
+// IsNamespaced returns true if the tool is namespaced, meaning it has a namespace prefix.
+// This method implements part of the ToolExecutor interface.
+func (b *BaseTool) IsNamespaced() bool {
+	return strings.Contains(b.Name, ":")
+}
+
+// Namespace adds a namespace prefix to the tool's name.
+func (b *BaseTool) Namespace(namespace string) {
+	b.Name = namespace + ":" + b.Name
 }
 
 // GetName returns the tool's name, which is used to identify it when called.

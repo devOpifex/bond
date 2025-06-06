@@ -11,6 +11,12 @@ import (
 // ToolExecutor defines the interface for tools that can be executed by AI models.
 // Tools are functions that AI models can call to perform actions or retrieve information.
 type ToolExecutor interface {
+	// IsNamespaced returns true if the tool is namespaced, meaning it has a namespace prefix.
+	IsNamespaced() bool
+
+	// GetName returns the name of the tool, which is used to identify it when called.
+	Namespace(string)
+
 	// GetName returns the name of the tool, which is used to identify it when called.
 	GetName() string
 

@@ -24,7 +24,7 @@ type ToolUse struct {
 
 	// Input contains the parameters for the tool call as a JSON-formatted string.
 	// This can be a JSON string or structured parameters depending on the provider.
-	Input interface{} `json:"input"`
+	Input any `json:"input"`
 }
 
 // ToolResult represents the result of a tool execution.
@@ -97,6 +97,9 @@ type InputSchema struct {
 	// Type is usually "object" for tool inputs.
 	Type string `json:"type"`
 
+	// Description explains what the tool does, helping the AI decide when to use it.
+	Description string `json:"description"`
+
 	// Properties maps parameter names to their type definitions.
 	Properties map[string]Property `json:"properties"`
 
@@ -112,4 +115,7 @@ type Property struct {
 
 	// Description explains what this parameter is used for.
 	Description string `json:"description"`
+
+	// Properties is a nested schema for nested objects.
+	Properties map[string]Property `json:"properties,omitempty"`
 }

@@ -108,6 +108,24 @@ type InputSchema struct {
 
 	// AdditionalProperties indicates whether additional properties are allowed.
 	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
+	
+	// MinProperties specifies the minimum number of properties in an object.
+	MinProperties *int `json:"minProperties,omitempty"`
+	
+	// MaxProperties specifies the maximum number of properties in an object.
+	MaxProperties *int `json:"maxProperties,omitempty"`
+	
+	// OneOf specifies a set of possible schemas, of which one must match.
+	OneOf []InputSchema `json:"oneOf,omitempty"`
+	
+	// AnyOf specifies a set of possible schemas, of which at least one must match.
+	AnyOf []InputSchema `json:"anyOf,omitempty"`
+	
+	// AllOf specifies a set of schemas, all of which must match.
+	AllOf []InputSchema `json:"allOf,omitempty"`
+	
+	// Not specifies a schema which must not match.
+	Not *InputSchema `json:"not,omitempty"`
 }
 
 // Property defines a single parameter in a tool's input schema.
@@ -163,4 +181,34 @@ type Property struct {
 
 	// AdditionalProperties indicates whether additional properties are allowed.
 	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
+	
+	// Pattern specifies a regex pattern for string validation.
+	Pattern string `json:"pattern,omitempty"`
+	
+	// MultipleOf specifies that a number must be a multiple of this value.
+	MultipleOf *float64 `json:"multipleOf,omitempty"`
+	
+	// ExclusiveMinimum indicates whether the minimum value is exclusive.
+	ExclusiveMinimum *bool `json:"exclusiveMinimum,omitempty"`
+	
+	// ExclusiveMaximum indicates whether the maximum value is exclusive.
+	ExclusiveMaximum *bool `json:"exclusiveMaximum,omitempty"`
+	
+	// UniqueItems indicates whether array items must be unique.
+	UniqueItems *bool `json:"uniqueItems,omitempty"`
+	
+	// MaxProperties specifies the maximum number of properties in an object.
+	MaxProperties *int `json:"maxProperties,omitempty"`
+	
+	// MinProperties specifies the minimum number of properties in an object.
+	MinProperties *int `json:"minProperties,omitempty"`
+	
+	// AnyOf specifies a set of possible schemas, of which at least one must match.
+	AnyOf []Property `json:"anyOf,omitempty"`
+	
+	// AllOf specifies a set of schemas, all of which must match.
+	AllOf []Property `json:"allOf,omitempty"`
+	
+	// Not specifies a schema which must not match.
+	Not *Property `json:"not,omitempty"`
 }

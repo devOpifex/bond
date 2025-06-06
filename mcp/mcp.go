@@ -96,15 +96,6 @@ func (m *MCP) GetRegistry() []models.ToolExecutor {
 	return m.toolRegistry.GetAll()
 }
 
-// convertToMCPTool converts a Bond tool to an MCP-compatible tool definition
-func convertToMCPTool(tool models.ToolExecutor) tools.BaseTool {
-	return tools.BaseTool{
-		Name:        tool.GetName(),
-		Description: tool.GetDescription(),
-		Schema:      tool.GetSchema(),
-	}
-}
-
 // SetDefaultTimeout sets the default timeout for requests
 func (m *MCP) SetDefaultTimeout(timeout time.Duration) {
 	m.defaultTimeout = timeout

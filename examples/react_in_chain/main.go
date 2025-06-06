@@ -22,8 +22,8 @@ func main() {
 	// Create a Claude provider
 	provider := claude.NewClient(apiKey)
 
-	// Create a ReAct agent with tools
-	reactAgent := reasoning.NewReActAgent(provider)
+	// Create a React agent with tools
+	reactAgent := reasoning.NewReactAgent(provider)
 	
 	// Register calculator tool
 	calculator := tools.NewTool(
@@ -46,7 +46,7 @@ func main() {
 	)
 	reactAgent.RegisterTool(calculator)
 
-	// Create a chain that uses the ReAct agent as a step
+	// Create a chain that uses the React agent as a step
 	chain := reasoning.NewChain()
 	
 	// Add preprocessing step
@@ -57,10 +57,10 @@ func main() {
 			return fmt.Sprintf("I need help with this question: %s", input), nil
 		},
 	)).
-	// Add the ReAct agent as a step
+	// Add the React agent as a step
 	Then(reactAgent.AsStep(
 		"Solve Problem",
-		"Uses a ReAct agent with tools to solve the problem",
+		"Uses a React agent with tools to solve the problem",
 	)).
 	// Add postprocessing step
 	Then(reasoning.WithProcessor(

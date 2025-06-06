@@ -236,16 +236,16 @@ func main() {
 }
 ```
 
-## ReAct Agent
+## React Agent
 
-Bond provides a ReAct (Reasoning + Acting) agent implementation that combines reasoning with tool use in an iterative process:
+Bond provides a React (Reasoning + Acting) agent implementation that combines reasoning with tool use in an iterative process:
 
 ```go
 // Create a provider
 provider := claude.NewClient(os.Getenv("ANTHROPIC_API_KEY"))
 
-// Create a ReAct agent
-reactAgent := reasoning.NewReActAgent(provider)
+// Create a React agent
+reactAgent := reasoning.NewReactAgent(provider)
 
 // Configure the agent (optional)
 reactAgent.SetMaxIterations(5)  // Default is 10
@@ -254,21 +254,21 @@ reactAgent.SetSystemPrompt("Custom system prompt")  // Override default prompt
 // Register tools with the agent
 reactAgent.RegisterTool(myTool)
 
-// Process a query using the ReAct agent
+// Process a query using the React agent
 ctx := context.Background()
 result, err := reactAgent.Process(ctx, "What is 21 + 21?")
 ```
 
-The ReAct agent:
+The React agent:
 - Maintains an internal conversation state
 - Parses tool usage from model responses
 - Executes tools and feeds results back to the model
 - Continues iterations until a final answer is reached
 - Supports easy integration with the Chain API
 
-### Using ReAct in Chains
+### Using React in Chains
 
-The ReAct agent can be integrated into reasoning chains:
+The React agent can be integrated into reasoning chains:
 
 ```go
 // Create a chain
@@ -283,10 +283,10 @@ chain.Add(reasoning.WithProcessor(
     },
 ))
 
-// Add the ReAct agent as a step
+// Add the React agent as a step
 chain.Then(reactAgent.AsStep(
     "Solve Problem",
-    "Uses a ReAct agent with tools to solve the problem",
+    "Uses a React agent with tools to solve the problem",
 ))
 
 // Add postprocessing step
@@ -326,7 +326,7 @@ The simplified Chain API:
 - Eliminates complex dependency management
 - Simplifies state management between steps
 - Offers a fluent interface for better readability
-- Seamlessly integrates with ReAct agents
+- Seamlessly integrates with React agents
 
 Each step in a chain takes the output of the previous step as its input, creating a clean data flow throughout the execution process.
 

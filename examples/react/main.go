@@ -28,8 +28,8 @@ func main() {
 	provider.SetModel("claude-3-sonnet-20240229")
 	provider.SetMaxTokens(1000)
 
-	// Create a ReAct agent
-	reactAgent := reasoning.NewReActAgent(provider)
+	// Create a React agent
+	reactAgent := reasoning.NewReactAgent(provider)
 	
 	// Set a simplified system prompt that helps the model understand context
 	reactAgent.SetSystemPrompt(`You are a helpful assistant that can use tools to solve problems.
@@ -100,7 +100,7 @@ After receiving tool results, provide a concise final answer to the user's quest
 	reactAgent.RegisterTool(calculator)
 	reactAgent.SetMaxIterations(3) // Limit iterations to prevent infinite loops
 
-	// Process a query using the ReAct agent
+	// Process a query using the React agent
 	fmt.Println("Asking: What is 21 + 21?")
 	ctx := context.Background()
 	

@@ -13,11 +13,11 @@ import (
 	"github.com/devOpifex/bond/models"
 )
 
-// ReActAgent implements the Reasoning + Acting (ReAct) pattern for AI agents.
+// ReactAgent implements the Reasoning + Acting (React) pattern for AI agents.
 // This pattern involves alternating between reasoning about a problem and taking
 // actions (using tools) to gather information or make progress toward a solution.
-// The ReActAgent manages the cycle of reasoning, tool selection, and tool execution.
-type ReActAgent struct {
+// The ReactAgent manages the cycle of reasoning, tool selection, and tool execution.
+type ReactAgent struct {
 	// provider is the LLM provider that handles communication with the AI model
 	provider models.Provider
 
@@ -34,45 +34,45 @@ type ReActAgent struct {
 	messages []models.Message
 }
 
-// NewReActAgent creates a new ReAct agent with the specified provider.
+// NewReactAgent creates a new React agent with the specified provider.
 // It initializes the agent with default settings that can be customized
 // through the SetMaxIterations and SetSystemPrompt methods.
-func NewReActAgent(provider models.Provider) *ReActAgent {
-	return &ReActAgent{
+func NewReactAgent(provider models.Provider) *ReactAgent {
+	return &ReactAgent{
 		provider:      provider,
 		tools:         make(map[string]models.ToolExecutor),
 		maxIterations: 10,
 		messages:      []models.Message{},
-		systemPrompt:  defaultReActPrompt,
+		systemPrompt:  defaultReactPrompt,
 	}
 }
 
 // RegisterTool adds a tool to the agent's available tools.
 // The tool is stored in the agent's tool registry and will be
 // available for the AI model to use during reasoning.
-func (ra *ReActAgent) RegisterTool(tool models.ToolExecutor) {
+func (ra *ReactAgent) RegisterTool(tool models.ToolExecutor) {
 	ra.tools[tool.GetName()] = tool
 }
 
 // SetMaxIterations configures the maximum number of reasoning-action cycles.
 // This prevents the agent from getting stuck in infinite loops by limiting
 // how many times it can go through the reasoning-action cycle.
-func (ra *ReActAgent) SetMaxIterations(iterations int) {
+func (ra *ReactAgent) SetMaxIterations(iterations int) {
 	ra.maxIterations = iterations
 }
 
 // SetSystemPrompt overrides the default system prompt with a custom one.
 // The system prompt provides instructions to the AI model about how to
 // behave and how to structure its responses.
-func (ra *ReActAgent) SetSystemPrompt(prompt string) {
+func (ra *ReactAgent) SetSystemPrompt(prompt string) {
 	ra.systemPrompt = prompt
 }
 
 // Process implements the Agent interface and can be used as a step in a Chain.
-// It executes the ReAct pattern, alternating between model reasoning and tool execution
+// It executes the React pattern, alternating between model reasoning and tool execution
 // until a final response is reached or the maximum iterations limit is hit.
 // This method handles the entire conversation flow, tool execution, and context management.
-func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error) {
+func (ra *ReactAgent) Process(ctx context.Context, input string) (string, error) {
 	// Reset messages for this new conversation
 	ra.messages = []models.Message{
 		// Don't include system message in the messages array
@@ -93,7 +93,7 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 
 	var finalResponse string
 
-	// Main ReAct loop
+	// Main React loop
 	for i := 0; i < ra.maxIterations; i++ {
 		// Get the last message to send to the provider
 		lastMessage := ra.messages[len(ra.messages)-1]
@@ -188,10 +188,10 @@ func (ra *ReActAgent) Process(ctx context.Context, input string) (string, error)
 	return finalResponse, nil
 }
 
-// AsStep returns the ReActAgent as a Chain Step for easy integration into workflows.
-// This allows the ReAct agent to be used as a component in a larger reasoning pipeline.
+// AsStep returns the ReactAgent as a Chain Step for easy integration into workflows.
+// This allows the React agent to be used as a component in a larger reasoning pipeline.
 // The name and description parameters are used to identify the step in the chain.
-func (ra *ReActAgent) AsStep(name string, description string) *Step {
+func (ra *ReactAgent) AsStep(name string, description string) *Step {
 	return &Step{
 		Name:        name,
 		Description: description,
@@ -265,8 +265,8 @@ func parseResponse(response string) (*models.ToolUse, string, bool) {
 	return nil, response, true
 }
 
-// Default system prompt for ReAct agents
-const defaultReActPrompt = `You are a ReAct agent that can use tools to solve problems.
+// Default system prompt for React agents
+const defaultReactPrompt = `You are a React agent that can use tools to solve problems.
 For each step:
 1. Think about what to do next
 2. If you need to use a tool, format your response like this:

@@ -29,13 +29,13 @@ chain.Add(step1).Then(step2)  // Method chaining supported
 result, err := chain.Execute(ctx, "initial input")
 ```
 
-### ReActAgent
+### ReactAgent
 
 A Reasoning + Acting agent that follows a loop of reasoning about what to do next, taking actions using tools, and incorporating observations to achieve a goal:
 
 ```go
 provider := claude.NewClaudeProvider("<API_KEY>")
-reactAgent := reasoning.NewReActAgent(provider)
+reactAgent := reasoning.NewReactAgent(provider)
 reactAgent.RegisterTool(someTool)
 result, err := reactAgent.Process(ctx, "Solve this problem...")
 ```

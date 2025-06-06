@@ -358,48 +358,35 @@ func (m *MCP) Call(method string, params any) (*Response, error) {
 
 // ListTools queries the MCP server for available tools
 func (m *MCP) ListTools() (*ToolListResult, error) {
-	m.runningMtx.Lock()
-	running := m.running
-	m.runningMtx.Unlock()
+	params := map[string]string{}
 
-	// If MCP is running, query the server
-	if running {
-		params := map[string]string{}
-
-		response, err := m.Call("tools/list", params)
-		if err != nil {
-			return nil, fmt.Errorf("failed to list tools: %w", err)
-		}
-
-		if response.Error != nil {
-			return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
-		}
-
-		// Convert the result to a ToolListResult
-		resultBytes, err := json.Marshal(response.Result)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal tool list result: %w", err)
-		}
-
-		var toolList ToolListResult
-		if err := json.Unmarshal(resultBytes, &toolList); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal tool list result: %w", err)
-		}
-
-		return &toolList, nil
+	response, err := m.Call("tools/list", params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tools: %w", err)
 	}
 
-	// If MCP is not running, return the local tool registry
-	tls := m.toolRegistry.GetAll()
-	mcpTools := make([]tools.BaseTool, 0, len(tls))
-
-	for _, tool := range tls {
-		mcpTools = append(mcpTools, convertToMCPTool(tool))
+	if response.Error != nil {
+		return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
 	}
 
-	return &ToolListResult{
-		Tools: mcpTools,
-	}, nil
+	fmt.Println(response.Result)
+
+	// Convert the result to a ToolListResult
+	resultBytes, err := json.Marshal(response.Result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tool list result: %w", err)
+	}
+
+	var toolList ToolListResult
+	if err := json.Unmarshal(resultBytes, &toolList); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal tool list result: %w", err)
+	}
+
+	for _, tool := range toolList.Tools {
+		m.toolRegistry.Add(&tool)
+	}
+
+	return &toolList, nil
 }
 
 // CallTool invokes a tool on the MCP server with the given name and arguments

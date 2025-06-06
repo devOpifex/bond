@@ -161,18 +161,18 @@ func (p *Provider) prepareChatContext(ctx context.Context, message models.Messag
 
 // prepareToolsForRequest converts the registered tools to Claude's API format.
 // It builds a list of tool definitions that Claude can understand and use.
-func (p *Provider) prepareToolsForRequest() []map[string]interface{} {
-	toolDefinitions := make([]map[string]interface{}, 0, len(p.Tools))
+func (p *Provider) prepareToolsForRequest() []map[string]any {
+	toolDefinitions := make([]map[string]any, 0, len(p.Tools))
 
 	for _, tool := range p.Tools {
 		// Convert each tool to Claude's expected format
 		schema := tool.GetSchema()
 
 		// Convert the schema to a JSON Schema compatible format
-		toolDef := map[string]interface{}{
+		toolDef := map[string]any{
 			"name":        tool.GetName(),
 			"description": tool.GetDescription(),
-			"input_schema": map[string]interface{}{
+			"input_schema": map[string]any{
 				"type":       schema.Type,
 				"properties": schema.Properties,
 			},
@@ -180,7 +180,7 @@ func (p *Provider) prepareToolsForRequest() []map[string]interface{} {
 
 		// Add required fields if any
 		if len(schema.Required) > 0 {
-			toolDef["input_schema"].(map[string]interface{})["required"] = schema.Required
+			toolDef["input_schema"].(map[string]any)["required"] = schema.Required
 		}
 
 		toolDefinitions = append(toolDefinitions, toolDef)
@@ -286,10 +286,12 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 				// Check if this is a namespaced MCP tool
 				if tool.IsNamespaced() {
 					// Extract namespace from tool name
-					parts := strings.Split(tool.GetName(), ":")
+					parts := strings.Split(tool.GetName(), "__")
 					if len(parts) > 1 {
 						namespace := parts[0]
 						toolName := parts[1]
+
+						fmt.Printf("Namespace: %s, Tool: %s\n", namespace, toolName)
 
 						// Find the MCP client for this namespace
 						mcpClient, exists := p.MCPs[namespace]

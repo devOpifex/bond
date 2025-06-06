@@ -12,13 +12,13 @@ import (
 func main() {
 	claude := claude.New(os.Getenv("ANTHROPIC_API_KEY"))
 
-	claude.RegisterMCP("mcpOrchestra", nil)
+	claude.RegisterMCP("orchestra", nil)
 
 	ctx := context.Background()
 
 	response, err := claude.SendMessageWithTools(ctx, models.Message{
 		Role:    models.RoleUser,
-		Content: "Find John's email address using mcpOrchestra:search_email",
+		Content: "Get the codelist for the core_dpp. use orchestra:get_codelists",
 	})
 
 	if err != nil {

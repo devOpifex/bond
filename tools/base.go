@@ -31,12 +31,12 @@ type BaseTool struct {
 // IsNamespaced returns true if the tool is namespaced, meaning it has a namespace prefix.
 // This method implements part of the ToolExecutor interface.
 func (b *BaseTool) IsNamespaced() bool {
-	return strings.Contains(b.Name, ":")
+	return strings.Contains(b.Name, "__")
 }
 
 // Namespace adds a namespace prefix to the tool's name.
 func (b *BaseTool) Namespace(namespace string) {
-	b.Name = namespace + ":" + b.Name
+	b.Name = namespace + "__" + b.Name
 }
 
 // GetName returns the tool's name, which is used to identify it when called.

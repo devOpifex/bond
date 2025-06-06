@@ -25,7 +25,16 @@ type BaseTool struct {
 	Schema models.InputSchema `json:"inputSchema"`
 
 	// Handler is the function that implements the tool's actual functionality
-	Handler func(params map[string]any) (string, error)
+	Handler func(params map[string]any) (string, error) `json:"-"`
+
+	// Annotations provides additional metadata about the tool
+	Annotations map[string]any `json:"annotations,omitempty"`
+
+	// Version indicates the tool's version
+	Version string `json:"version,omitempty"`
+
+	// Deprecated indicates if the tool is deprecated
+	Deprecated bool `json:"deprecated,omitempty"`
 }
 
 // IsNamespaced returns true if the tool is namespaced, meaning it has a namespace prefix.

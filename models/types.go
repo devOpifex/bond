@@ -105,6 +105,9 @@ type InputSchema struct {
 
 	// Required lists which parameters must be provided.
 	Required []string `json:"required,omitempty"`
+
+	// AdditionalProperties indicates whether additional properties are allowed.
+	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
 }
 
 // Property defines a single parameter in a tool's input schema.
@@ -118,4 +121,46 @@ type Property struct {
 
 	// Properties is a nested schema for nested objects.
 	Properties map[string]Property `json:"properties,omitempty"`
+
+	// Format specifies the format of a string value (e.g., "email", "date-time").
+	Format string `json:"format,omitempty"`
+
+	// Enum lists the allowed values for this property.
+	Enum []any `json:"enum,omitempty"`
+
+	// Minimum specifies the minimum value for a numeric property.
+	Minimum *float64 `json:"minimum,omitempty"`
+
+	// Maximum specifies the maximum value for a numeric property.
+	Maximum *float64 `json:"maximum,omitempty"`
+
+	// MinLength specifies the minimum length for a string property.
+	MinLength *int `json:"minLength,omitempty"`
+
+	// MaxLength specifies the maximum length for a string property.
+	MaxLength *int `json:"maxLength,omitempty"`
+
+	// MinItems specifies the minimum number of items for an array property.
+	MinItems *int `json:"minItems,omitempty"`
+
+	// MaxItems specifies the maximum number of items for an array property.
+	MaxItems *int `json:"maxItems,omitempty"`
+
+	// Default specifies the default value for this property.
+	Default any `json:"default,omitempty"`
+
+	// OneOf specifies a set of possible schemas, of which one must match.
+	OneOf []Property `json:"oneOf,omitempty"`
+
+	// Items specifies the schema for array items.
+	Items *Property `json:"items,omitempty"`
+
+	// Examples provides example values for this property.
+	Examples []any `json:"examples,omitempty"`
+
+	// Required lists which properties must be provided (for nested objects).
+	Required []string `json:"required,omitempty"`
+
+	// AdditionalProperties indicates whether additional properties are allowed.
+	AdditionalProperties *bool `json:"additionalProperties,omitempty"`
 }

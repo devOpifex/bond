@@ -58,6 +58,19 @@ provider.SetSystemPrompt("You are a helpful assistant that specializes in data a
 
 The system prompt provides context and instructions that persist across the conversation.
 
+### Temperature Control
+
+You can adjust the temperature parameter to control the randomness of the model's responses:
+
+```go
+// Set temperature (0.0-1.0)
+provider.SetTemperature(0.7) // Default value
+provider.SetTemperature(0.2) // More deterministic/focused responses
+provider.SetTemperature(0.9) // More creative/varied responses
+```
+
+Lower temperatures (closer to 0) produce more deterministic, focused responses, while higher temperatures (closer to 1) produce more varied, creative responses.
+
 ## Basic Example
 
 Here's a simple example showing how to create a custom tool, register it with Claude, and use it:
@@ -82,6 +95,7 @@ func main() {
 	// Configure provider
 	provider.SetModel("claude-3-sonnet-20240229")
 	provider.SetMaxTokens(1000)
+	provider.SetTemperature(0.7) // Default value, can be adjusted (0.0-1.0)
 
 	// Create a weather tool
 	weatherTool := tools.NewTool(
@@ -369,6 +383,7 @@ Bond is designed to be extensible, making it easy to add support for new AI prov
    - `SetSystemPrompt`: Configure the system prompt
    - `SetModel`: Configure which model to use
    - `SetMaxTokens`: Configure max response tokens
+   - `SetTemperature`: Configure response randomness/creativity
 
 ### Example Implementation Structure
 
@@ -383,22 +398,24 @@ import (
 
 // Client implements the models.Provider interface
 type Client struct {
-	apiKey     string
-	model      string
-	maxTokens  int
+	apiKey       string
+	model        string
+	maxTokens    int
+	temperature  float64
 	systemPrompt string
-	tools      []models.ToolExecutor
-	httpClient *common.Client
+	tools        []models.ToolExecutor
+	httpClient   *common.Client
 }
 
 // NewClient creates a new client for MyProvider
 func NewClient(apiKey string) *Client {
 	return &Client{
-		apiKey:     apiKey,
-		model:      "default-model",
-		maxTokens:  1000,
-		httpClient: common.NewClient(),
-		tools:      []models.ToolExecutor{},
+		apiKey:      apiKey,
+		model:       "default-model",
+		maxTokens:   1000,
+		temperature: 0.7, // Default temperature
+		httpClient:  common.NewClient(),
+		tools:       []models.ToolExecutor{},
 	}
 }
 
@@ -425,6 +442,10 @@ func (c *Client) SetModel(model string) {
 
 func (c *Client) SetMaxTokens(tokens int) {
 	c.maxTokens = tokens
+}
+
+func (c *Client) SetTemperature(temperature float64) {
+	c.temperature = temperature
 }
 ```
 

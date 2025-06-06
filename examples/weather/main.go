@@ -17,7 +17,8 @@ func main() {
 	// Configure provider
 	provider.SetModel("claude-3-sonnet-20240229")
 	provider.SetMaxTokens(1000)
-	provider.SetSystemPrompt("You are a weather assistant. Always answer questions about weather concisely.")
+	provider.SetSystemPrompt("You are a weather assistant. Always answer questions about weather concisely. When someone asks about weather in a location, use the get_weather tool.")
+	provider.SetTemperature(0.2)
 
 	// Create a weather tool
 	weatherTool := tools.NewTool(
@@ -33,10 +34,13 @@ func main() {
 			},
 			Required: []string{"location"},
 		},
-		func(params map[string]interface{}) (string, error) {
+		func(params map[string]any) (string, error) {
+			fmt.Println("Weather tool called with params:", params)
 			location, _ := params["location"].(string)
 			// In a real implementation, you would call a weather API here
-			return fmt.Sprintf("The weather in %s is 5°C and rainy as usual", location), nil
+			result := fmt.Sprintf("The weather in %s is 5°C and rainy as usual", location)
+			fmt.Println("Weather tool returning:", result)
+			return result, nil
 		},
 	)
 

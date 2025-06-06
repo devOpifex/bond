@@ -24,12 +24,12 @@ func NewRegistry() *Registry {
 func (r *Registry) Register(tool models.ToolExecutor) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	name := tool.GetName()
 	if _, exists := r.tools[name]; exists {
 		return fmt.Errorf("tool with name '%s' already registered", name)
 	}
-	
+
 	r.tools[name] = tool
 	return nil
 }
@@ -38,7 +38,7 @@ func (r *Registry) Register(tool models.ToolExecutor) error {
 func (r *Registry) Get(name string) (models.ToolExecutor, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tool, exists := r.tools[name]
 	return tool, exists
 }
@@ -47,7 +47,7 @@ func (r *Registry) Get(name string) (models.ToolExecutor, bool) {
 func (r *Registry) GetAll() []models.ToolExecutor {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	tools := make([]models.ToolExecutor, 0, len(r.tools))
 	for _, tool := range r.tools {
 		tools = append(tools, tool)
@@ -59,6 +59,14 @@ func (r *Registry) GetAll() []models.ToolExecutor {
 func (r *Registry) Remove(name string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	
+
 	delete(r.tools, name)
 }
+
+func (r *Registry) Add(tool models.ToolExecutor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.tools[tool.GetName()] = tool
+}
+

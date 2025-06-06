@@ -54,9 +54,9 @@ type OpenAIResponse struct {
 
 // OpenAIChoice represents a choice in an OpenAI response
 type OpenAIChoice struct {
-	Index        int              `json:"index"`
+	Index        int               `json:"index"`
 	Message      OpenAIRespMessage `json:"message"`
-	FinishReason string           `json:"finish_reason"`
+	FinishReason string            `json:"finish_reason"`
 }
 
 // OpenAIRespMessage represents a message in an OpenAI response
@@ -95,7 +95,7 @@ func NewClient(apiKey string) *Client {
 		"https://api.openai.com/v1/chat/completions",
 		"gpt-4o",
 	)
-	
+
 	return &Client{
 		BaseClient: baseClient,
 	}
@@ -106,7 +106,7 @@ func NewClient(apiKey string) *Client {
 // without tool capabilities.
 func (c *Client) SendMessage(ctx context.Context, message models.Message) (string, error) {
 	var messages []OpenAIMessage
-	
+
 	// Add system prompt if set
 	if c.SystemPrompt != "" {
 		messages = append(messages, OpenAIMessage{
@@ -114,18 +114,18 @@ func (c *Client) SendMessage(ctx context.Context, message models.Message) (strin
 			Content: c.SystemPrompt,
 		})
 	}
-	
+
 	// Add the user/assistant message
 	messages = append(messages, OpenAIMessage{
 		Role:    message.Role,
 		Content: message.Content,
 	})
-	
+
 	request := OpenAIRequest{
 		Model:       c.Model,
 		MaxTokens:   c.MaxTokens,
 		Messages:    messages,
-		Temperature: 0.7,
+		Temperature: c.Temperature,
 	}
 
 	return c.sendRequest(ctx, request)
@@ -139,7 +139,7 @@ func convertToolSchema(schema models.InputSchema) (json.RawMessage, error) {
 	openaiSchema := map[string]interface{}{
 		"type": schema.Type,
 	}
-	
+
 	if len(schema.Properties) > 0 {
 		props := make(map[string]interface{})
 		for name, prop := range schema.Properties {
@@ -150,11 +150,11 @@ func convertToolSchema(schema models.InputSchema) (json.RawMessage, error) {
 		}
 		openaiSchema["properties"] = props
 	}
-	
+
 	if len(schema.Required) > 0 {
 		openaiSchema["required"] = schema.Required
 	}
-	
+
 	return json.Marshal(openaiSchema)
 }
 
@@ -182,7 +182,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 	}
 
 	var messages []OpenAIMessage
-	
+
 	// Add system prompt if set
 	if c.SystemPrompt != "" {
 		messages = append(messages, OpenAIMessage{
@@ -190,7 +190,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 			Content: c.SystemPrompt,
 		})
 	}
-	
+
 	// Add the user/assistant message
 	messages = append(messages, OpenAIMessage{
 		Role:    message.Role,
@@ -203,7 +203,7 @@ func (c *Client) SendMessageWithTools(ctx context.Context, message models.Messag
 		Messages:    messages,
 		Tools:       tools,
 		ToolChoice:  "auto",
-		Temperature: 0.7,
+		Temperature: c.Temperature,
 	}
 
 	return c.sendRequest(ctx, request)
@@ -259,3 +259,4 @@ func (c *Client) sendRequest(ctx context.Context, request OpenAIRequest) (string
 	// Otherwise return the text content
 	return choice.Message.Content, nil
 }
+

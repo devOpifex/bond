@@ -54,6 +54,11 @@ type BaseClient struct {
 	// MaxTokens limits the length of the model's response
 	MaxTokens int
 	
+	// Temperature controls randomness in the model's response generation
+	// Higher values (e.g., 0.8) make output more random, while lower values (e.g., 0.2)
+	// make it more deterministic. Range is typically 0.0-1.0.
+	Temperature float64
+	
 	// SystemPrompt contains instructions included in all requests
 	SystemPrompt string
 }
@@ -68,9 +73,10 @@ func NewBaseClient(apiKey string, baseURL string, defaultModel string) BaseClien
 		HttpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		Tools:     make(map[string]models.ToolExecutor),
-		Model:     defaultModel,
-		MaxTokens: 1000,
+		Tools:       make(map[string]models.ToolExecutor),
+		Model:       defaultModel,
+		MaxTokens:   1000,
+		Temperature: 0.7, // Default temperature
 	}
 }
 
@@ -96,6 +102,14 @@ func (c *BaseClient) SetMaxTokens(tokens int) {
 // This implements part of the models.Provider interface.
 func (c *BaseClient) SetSystemPrompt(prompt string) {
 	c.SystemPrompt = prompt
+}
+
+// SetTemperature configures the temperature parameter for the model's response generation.
+// Higher values (e.g., 0.8) make output more random, while lower values (e.g., 0.2)
+// make it more deterministic. Range is typically 0.0-1.0.
+// This implements part of the models.Provider interface.
+func (c *BaseClient) SetTemperature(temperature float64) {
+	c.Temperature = temperature
 }
 
 // DoHTTPRequest performs an HTTP request and returns the response body.
@@ -149,4 +163,16 @@ func (c *BaseClient) HandleToolCall(ctx context.Context, toolName string, input 
 	}
 
 	return result, nil
+}
+
+// ErrorResponse is a standard error structure returned by API providers.
+type ErrorResponse struct {
+	Error *ErrorDetail `json:"error,omitempty"`
+}
+
+// ErrorDetail contains the details of an API error.
+type ErrorDetail struct {
+	Message string `json:"message"`
+	Type    string `json:"type,omitempty"`
+	Code    string `json:"code,omitempty"`
 }

@@ -81,7 +81,7 @@ step := reasoning.WithProcessor(
 
 ## Example Usage
 
-See the `/examples/simple_chain/main.go` for a complete example of using the simplified Chain API.
+See the `/examples/react_in_chain/main.go` for a complete example of using the simplified Chain API.
 
 ```go
 // Create a chain

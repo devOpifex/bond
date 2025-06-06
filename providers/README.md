@@ -10,7 +10,7 @@ The base provider implements common functionality shared across all providers:
 
 ```go
 type BaseProvider struct {
-	tools []tools.Tool
+	tools []models.ToolExecutor
 }
 ```
 
@@ -54,17 +54,7 @@ All providers implement the `models.Provider` interface:
    })
    ```
 
-2. **Conversation History**:
-   ```go
-   response, err := provider.SendMessageWithHistory(ctx, []models.Message{
-       {Role: models.RoleSystem, Content: "You are a helpful assistant."},
-       {Role: models.RoleUser, Content: "What's the weather like?"},
-       {Role: models.RoleAssistant, Content: "I don't have access to current weather data."},
-       {Role: models.RoleUser, Content: "What can you help me with then?"},
-   })
-   ```
-
-3. **Function Calling / Tools**:
+2. **Tool Integration**:
    ```go
    // Register a tool
    provider.RegisterTool(weatherTool)
@@ -73,6 +63,18 @@ All providers implement the `models.Provider` interface:
    response, err := provider.SendMessageWithTools(ctx, models.Message{
        Role:    models.RoleUser, 
        Content: "What's the weather in New York?",
+   })
+   ```
+
+3. **MCP Integration**:
+   ```go
+   // Register an MCP server with the provider
+   provider.RegisterMCP("orchestra", nil)
+   
+   // Send a message that might use MCP tools
+   response, err := provider.SendMessageWithTools(ctx, models.Message{
+       Role:    models.RoleUser,
+       Content: "Get the codelist for the core_dpp study.",
    })
    ```
 

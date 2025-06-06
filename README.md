@@ -20,6 +20,7 @@ Bond provides a flexible framework for:
 - **agent**: Framework for building specialized agents for different capabilities
 - **providers**: Integration with AI providers (Claude, OpenAI)
 - **reasoning**: Multi-step reasoning with state management and workflow orchestration
+- **mcp**: Implementation of the Model Context Protocol for external tool integration
 
 ## Installation
 
@@ -370,6 +371,69 @@ The reasoning package provides:
 - **Custom processors**: Implement custom logic in any step
 
 See the `examples/code/main.go` for a complete example of using multi-step reasoning for a complex code generation and analysis task.
+
+## Model Context Protocol (MCP) Integration
+
+Bond provides support for the Model Context Protocol (MCP), which allows integration with external tool servers. This enables providers to use tools that are defined and executed in external processes.
+
+```go
+// Create a Claude provider
+claude := claude.New(os.Getenv("ANTHROPIC_API_KEY"))
+
+// Register an MCP server with the provider
+claude.RegisterMCP("orchestra", nil)
+
+// Send a message that might use MCP tools
+ctx := context.Background()
+response, err := claude.SendMessageWithTools(ctx, models.Message{
+    Role:    models.RoleUser,
+    Content: "Get the codelist for the core_dpp study. use orchestra:get_codelists",
+})
+
+if err != nil {
+    fmt.Printf("Error: %v\n", err)
+    return
+}
+
+fmt.Println(response)
+```
+
+The MCP implementation supports:
+- Tool discovery from external MCP servers
+- Tool execution in external processes
+- Standardized JSON-RPC communication
+- Rich content types in tool responses
+
+The `mcp` package can also be used directly to create a standalone MCP client:
+
+```go
+// Create an MCP client
+mcpClient := mcp.New("orchestra", nil)
+
+// Initialize the MCP client
+capabilities, err := mcpClient.Initialise()
+if err != nil {
+    log.Fatalf("Failed to initialize MCP: %v", err)
+}
+
+// List available tools
+toolList, err := mcpClient.ListTools()
+if err != nil {
+    log.Fatalf("Failed to list tools: %v", err)
+}
+
+// Call a tool
+result, err := mcpClient.CallTool("get_codelists", map[string]any{
+    "study": "core_dpp",
+})
+if err != nil {
+    log.Fatalf("Failed to call tool: %v", err)
+}
+
+fmt.Printf("Tool result: %s\n", result.Result)
+```
+
+See the `examples/mcp/main.go` for a complete example of using MCP integration.
 
 ## Adding Support for a New Provider
 

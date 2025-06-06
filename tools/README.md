@@ -4,22 +4,24 @@ The `tools` package provides a framework for creating and managing tools that ca
 
 ## Key Components
 
-### Tool Interface
+### ToolExecutor Interface
 
 The central interface that all tools must implement:
 
 ```go
-type Tool interface {
+type ToolExecutor interface {
+	IsNamespaced() bool
+	Namespace(string)
 	GetName() string
 	GetDescription() string
-	GetInputSchema() models.InputSchema
-	Execute(params map[string]interface{}) (string, error)
+	GetSchema() models.InputSchema
+	Execute(input json.RawMessage) (string, error)
 }
 ```
 
 ### Base Tool Implementation
 
-The package provides a base implementation of the Tool interface:
+The package provides a base implementation of the ToolExecutor interface:
 
 ```go
 tool := tools.NewTool(
@@ -64,19 +66,19 @@ registry.Register(weatherTool)
 tool, exists := registry.Get("calculator")
 ```
 
-### Agent Tools
+### Namespaced Tools
 
-The package supports creating tools that delegate to agents:
+Tools can be namespaced to avoid name collisions and to indicate their source:
 
 ```go
-// Create an agent tool
-agentTool := tools.NewAgentTool(
-    "code_generator",
-    "Generates code in various programming languages",
-    models.InputSchema{...},
-    agentManager,
-    "code-generation-capability"
-)
+// Create a tool
+weatherTool := tools.NewTool(...)
+
+// Namespace the tool
+weatherTool.Namespace("weather")
+
+// The tool name is now "weather:get_weather"
+name := weatherTool.GetName() // Returns "weather:get_weather"
 ```
 
 ## Example Usage
@@ -150,4 +152,29 @@ if exists {
     })
     // result will be "35"
 }
+```
+
+### Integration with MCP
+
+Tools can be integrated with the Model Context Protocol:
+
+```go
+// Create an MCP client
+mcpClient := mcp.New("orchestra", nil)
+
+// Initialize the MCP
+mcpClient.Initialise()
+
+// Get tools from the MCP server
+toolList, _ := mcpClient.ListTools()
+
+// Register MCP tools with a provider
+provider := claude.NewClient(apiKey)
+provider.RegisterMCP("orchestra", nil)
+
+// The provider can now use tools from the MCP server
+response, err := provider.SendMessageWithTools(ctx, models.Message{
+    Role:    models.RoleUser,
+    Content: "Use the orchestra:get_data tool to retrieve information.",
+})
 ```

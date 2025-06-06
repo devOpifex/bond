@@ -16,13 +16,13 @@ import (
 // It handles parameter validation and execution of tool functions through a handler.
 type BaseTool struct {
 	// Name is the identifier used to call this tool
-	Name string
+	Name string `json:"name"`
 
 	// Description explains what the tool does, helping the AI decide when to use it
-	Description string
+	Description string `json:"description"`
 
 	// Schema defines the structure of inputs that this tool accepts
-	Schema models.InputSchema
+	Schema models.InputSchema `json:"inputSchema"`
 
 	// Handler is the function that implements the tool's actual functionality
 	Handler func(params map[string]any) (string, error)

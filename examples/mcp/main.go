@@ -18,7 +18,7 @@ func main() {
 
 	response, err := claude.SendMessageWithTools(ctx, models.Message{
 		Role:    models.RoleUser,
-		Content: "Get the codelist for the core_dpp. use orchestra:get_codelists",
+		Content: "Get the codelist for the core_dpp study. use orchestra:get_codelists",
 	})
 
 	if err != nil {

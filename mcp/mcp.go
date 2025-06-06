@@ -369,8 +369,6 @@ func (m *MCP) ListTools() (*ToolListResult, error) {
 		return nil, fmt.Errorf("server error: %s (code: %d)", response.Error.Message, response.Error.Code)
 	}
 
-	fmt.Println(response.Result)
-
 	// Convert the result to a ToolListResult
 	resultBytes, err := json.Marshal(response.Result)
 	if err != nil {

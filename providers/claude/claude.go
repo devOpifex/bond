@@ -196,7 +196,7 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 	messages := p.prepareChatContext(ctx, message)
 
 	// Create the request payload
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"model":       p.Model,
 		"messages":    messages,
 		"max_tokens":  p.MaxTokens,
@@ -290,8 +290,6 @@ func (p *Provider) sendRequest(ctx context.Context, message models.Message, with
 					if len(parts) > 1 {
 						namespace := parts[0]
 						toolName := parts[1]
-
-						fmt.Printf("Namespace: %s, Tool: %s\n", namespace, toolName)
 
 						// Find the MCP client for this namespace
 						mcpClient, exists := p.MCPs[namespace]
